@@ -1,0 +1,13 @@
+services:
+  db:
+    container_name: "async0-test"
+    image: postgres:12.4-alpine
+    volumes:
+      - "./database/postgres:/var/lib/postgresql/data:rw"
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: "async0"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    restart: unless-stopped
