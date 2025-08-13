@@ -33,7 +33,6 @@ CREATE TABLE IF NOT EXISTS problems (
   problem_number INTEGER UNIQUE,
   difficulty difficulty_enum NOT NULL DEFAULT 'NA',
   starter_code JSONB NOT NULL,
-  solution_code JSONB,
   time_limit INTEGER NOT NULL DEFAULT 2000,
   memory_limit INTEGER NOT NULL DEFAULT 256,
   acceptance_rate DECIMAL(5,2),

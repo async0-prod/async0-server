@@ -1,5 +1,9 @@
 -- +goose Up
 -- +goose StatementBegin
+
+DELETE FROM topics;
+DELETE FROM lists;
+
 INSERT INTO topics (name, slug)
 VALUES
 ('Arrays', 'arrays'),
