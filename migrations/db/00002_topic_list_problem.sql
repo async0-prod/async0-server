@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS problems (
   link VARCHAR(255),
   problem_number INTEGER UNIQUE,
   difficulty difficulty_enum NOT NULL DEFAULT 'NA',
-  starter_code JSONB NOT NULL,
+  starter_code TEXT NOT NULL,
   time_limit INTEGER NOT NULL DEFAULT 2000,
   memory_limit INTEGER NOT NULL DEFAULT 256,
   acceptance_rate DECIMAL(5,2),
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS problem_topics (
 CREATE TABLE IF NOT EXISTS list_problems (
   list_id UUID NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
   problem_id UUID NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
-  position INTEGER NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
   is_required BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
