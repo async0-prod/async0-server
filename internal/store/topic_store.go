@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -27,7 +28,7 @@ type StubbedProblem struct {
 }
 
 type TopicsWithProblems struct {
-	Topic    string           `json:"topic"`
+	Name     string           `json:"name"`
 	Problems []StubbedProblem `json:"problems"`
 }
 
@@ -86,60 +87,68 @@ func (ps *PostgresTopicStore) GetAllTopicsByListID(listID uuid.UUID) ([]models.T
 
 func (ps *PostgresTopicStore) GetAllTopicsAndProblemsByListID(listID uuid.UUID) ([]TopicsWithProblems, error) {
 	query := `
+		WITH ordered_topics AS (
+		    SELECT DISTINCT
+		        t.id,
+		        t.name,
+		        t.display_order
+		    FROM topics t
+		    JOIN problem_topics pt ON t.id = pt.topic_id
+		    JOIN problems p ON pt.problem_id = p.id
+		    JOIN list_problems lp ON p.id = lp.problem_id
+		    WHERE lp.list_id = $1
+		      AND t.is_active = true
+		      AND p.is_active = true
+		    ORDER BY t.display_order
+		)
 		SELECT
-		    t.name AS topic,
-		    p.id,
-		    p.name,
-		    p.slug,
-		    p.difficulty,
-		    lp.position
-		FROM list_problems lp
-		JOIN problems p ON lp.problem_id = p.id
-		JOIN problem_topics pt ON p.id = pt.problem_id
-		JOIN topics t ON pt.topic_id = t.id
-		WHERE lp.list_id = $1
-		ORDER BY t.display_order, lp.position;
+		    ot.name AS topic_name,
+		    COALESCE(
+		        json_agg(
+		            json_build_object(
+		                'id', p.id,
+		                'name', p.name,
+		                'slug', p.slug,
+		                'difficulty', p.difficulty,
+		                'position', lp.position
+		            ) ORDER BY lp.position
+		        ) FILTER (WHERE p.id IS NOT NULL),
+		        '[]'::json
+		    ) AS problems
+		FROM ordered_topics ot
+		LEFT JOIN problem_topics pt ON ot.id = pt.topic_id
+		LEFT JOIN problems p ON pt.problem_id = p.id AND p.is_active = true
+		LEFT JOIN list_problems lp ON p.id = lp.problem_id AND lp.list_id = $1
+		GROUP BY ot.name, ot.display_order
+		ORDER BY ot.display_order;
 	`
 
 	rows, err := ps.DB.Query(query, listID)
 	if err != nil {
-		return nil, fmt.Errorf("query error: %w", err)
+		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-
 	defer rows.Close()
 
-	grouped := make(map[string][]StubbedProblem)
-
+	var topics []TopicsWithProblems
 	for rows.Next() {
 		var (
-			topicName string
-			problem   StubbedProblem
+			topicName    string
+			problemsJSON string
 		)
 
-		err := rows.Scan(
-			&topicName,
-			&problem.ID,
-			&problem.Name,
-			&problem.Slug,
-			&problem.Difficulty,
-			&problem.Position,
-		)
-
+		err := rows.Scan(&topicName, &problemsJSON)
 		if err != nil {
-			return nil, fmt.Errorf("scan error: %w", err)
+			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 
-		grouped[topicName] = append(grouped[topicName], problem)
-	}
+		var problems []StubbedProblem
+		err = json.Unmarshal([]byte(problemsJSON), &problems)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal problems JSON: %w", err)
+		}
 
-	if rows.Err() != nil {
-		return nil, fmt.Errorf("row iteration error: %w", rows.Err())
-	}
-
-	var topics []TopicsWithProblems
-	for topic, problems := range grouped {
 		topics = append(topics, TopicsWithProblems{
-			Topic:    topic,
+			Name:     topicName,
 			Problems: problems,
 		})
 	}

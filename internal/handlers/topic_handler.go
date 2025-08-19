@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/grvbrk/async0_server/internal/auth"
+	"github.com/grvbrk/async0_server/internal/models"
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/utils"
 )
@@ -26,42 +27,51 @@ func NewTopicHandler(topicStore store.TopicStore, logger *log.Logger, oauth *aut
 }
 
 func (th *TopicHandler) HandlerGetTopics(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("list_id")
-
-	if id == "" {
-		th.Logger.Println("Error getting topics: list id is required")
-		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"message": "Bad Request"})
+	// Extract and validate list_id
+	listIDStr := r.URL.Query().Get("list_id")
+	if listIDStr == "" {
+		th.Logger.Printf("Missing required parameter: list_id")
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{
+			"error": "list_id parameter is required",
+		})
 		return
 	}
 
-	listID, err := uuid.Parse(id)
+	listID, err := uuid.Parse(listIDStr)
 	if err != nil {
-		th.Logger.Println("Error parsing list id", err)
-		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"message": "Bad Request"})
+		th.Logger.Printf("Invalid list_id format: %s, error: %v", listIDStr, err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{
+			"error": "invalid list_id format",
+		})
 		return
 	}
 
-	showProblems := r.URL.Query().Get("problems")
-
-	if showProblems == "" {
-		th.Logger.Println("Error getting topics: show problems param is required")
-		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"message": "Bad Request"})
-		return
+	showProblems := true
+	problemsParam := r.URL.Query().Get("problems")
+	if problemsParam != "" {
+		parsed, err := strconv.ParseBool(problemsParam)
+		if err != nil {
+			th.Logger.Printf("Invalid problems parameter: %s, error: %v", problemsParam, err)
+			utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{
+				"error": "problems parameter must be true or false",
+			})
+			return
+		}
+		showProblems = parsed
 	}
 
-	showProblemsBool, err := strconv.ParseBool(showProblems)
-	if err != nil {
-		th.Logger.Println("Error parsing show problems param", err)
-		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"message": "Bad Request"})
-		return
-	}
-
-	if !showProblemsBool {
+	if !showProblems {
 		topics, err := th.TopicStore.GetAllTopicsByListID(listID)
 		if err != nil {
-			th.Logger.Println("Error getting topics by list id", err)
-			utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
+			th.Logger.Printf("Error getting topics for list %s: %v", listID, err)
+			utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{
+				"error": "Internal Server Error",
+			})
 			return
+		}
+
+		if topics == nil {
+			topics = []models.Topic{}
 		}
 
 		utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": topics})
@@ -70,11 +80,16 @@ func (th *TopicHandler) HandlerGetTopics(w http.ResponseWriter, r *http.Request)
 
 	topics, err := th.TopicStore.GetAllTopicsAndProblemsByListID(listID)
 	if err != nil {
-		th.Logger.Println("Error getting topics with problems by list id", err)
-		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
+		th.Logger.Printf("Error getting topics with problems for list %s: %v", listID, err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{
+			"error": "Internal Server Error",
+		})
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": topics})
+	if topics == nil {
+		topics = []store.TopicsWithProblems{}
+	}
 
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": topics})
 }
