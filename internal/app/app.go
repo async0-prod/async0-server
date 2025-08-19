@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"github.com/grvbrk/async0_server/internal/auth"
+	"github.com/grvbrk/async0_server/internal/handlers"
 	adminHandler "github.com/grvbrk/async0_server/internal/handlers/admin"
 	"github.com/grvbrk/async0_server/internal/middlewares"
 	"github.com/grvbrk/async0_server/internal/store"
@@ -22,10 +23,16 @@ var (
 )
 
 type Application struct {
-	Logger              *log.Logger
-	Oauth               *auth.GoogleOauth
-	AdminOauth          *auth.AdminGoogleOauth
-	MiddlewareHandler   *middlewares.MiddlwareHandler
+	Logger                *log.Logger
+	Oauth                 *auth.GoogleOauth
+	AdminOauth            *auth.AdminGoogleOauth
+	MiddlewareHandler     *middlewares.MiddlwareHandler
+	UserProblemHandler    *handlers.ProblemHandler
+	UserListHandler       *handlers.ListHandler
+	UserTestcaseHandler   *handlers.TestcaseHandler
+	UserSubmissionHandler *handlers.SubmissionHandler
+	UserTopicHandler      *handlers.TopicHandler
+
 	AdminProblemHandler *adminHandler.AdminProblemHandler
 	AdminListHandler    *adminHandler.AdminListHandler
 	AdminTopicHandler   *adminHandler.AdminTopicHandler
@@ -54,6 +61,11 @@ func NewApplication() (*Application, error) {
 
 	// stores
 	userStore := store.NewPostgresUserStore(pgDB)
+	problemStore := store.NewPostgresProblemStore(pgDB)
+	listStore := store.NewPostgresListStore(pgDB)
+	testcaseStore := store.NewPostgresTestcaseStore(pgDB)
+	submissionStore := store.NewPostgresSubmissionStore(pgDB)
+	topicStore := store.NewPostgresTopicStore(pgDB)
 
 	// admin stores
 	// adminUserStore := admin.NewPostgresAdminUserStore(pgDB)
@@ -72,6 +84,11 @@ func NewApplication() (*Application, error) {
 	}
 
 	// handlers
+	userProblemHandler := handlers.NewProblemHandler(problemStore, logger, oauth)
+	userListHandler := handlers.NewListHandler(listStore, logger, oauth)
+	userTestcaseHandler := handlers.NewTestcaseHandler(testcaseStore, logger, oauth)
+	userSubmissionHandler := handlers.NewSubmissionHandler(submissionStore, testcaseStore, logger, oauth)
+	userTopicHandler := handlers.NewTopicHandler(topicStore, logger, oauth)
 
 	// admin handlers
 	adminProblemHandler := adminHandler.NewAdminProblemHandler(adminProblemStore, adminLogger, adminOauth)
@@ -79,10 +96,16 @@ func NewApplication() (*Application, error) {
 	adminTopicHandler := adminHandler.NewAdminTopicHandler(adminTopicStore, adminLogger, adminOauth)
 
 	app := &Application{
-		Logger:              logger,
-		Oauth:               oauth,
-		AdminOauth:          adminOauth,
-		MiddlewareHandler:   middlewareHandler,
+		Logger:                logger,
+		Oauth:                 oauth,
+		AdminOauth:            adminOauth,
+		MiddlewareHandler:     middlewareHandler,
+		UserProblemHandler:    userProblemHandler,
+		UserListHandler:       userListHandler,
+		UserTestcaseHandler:   userTestcaseHandler,
+		UserSubmissionHandler: userSubmissionHandler,
+		UserTopicHandler:      userTopicHandler,
+
 		AdminProblemHandler: adminProblemHandler,
 		AdminListHandler:    adminListHandler,
 		AdminTopicHandler:   adminTopicHandler,
