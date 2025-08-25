@@ -1,11 +1,10 @@
 package app
 
 import (
+	"context"
 	"log"
 	"os"
 
-	"github.com/gorilla/securecookie"
-	"github.com/gorilla/sessions"
 	"github.com/grvbrk/async0_server/internal/auth"
 	"github.com/grvbrk/async0_server/internal/handlers"
 	adminHandler "github.com/grvbrk/async0_server/internal/handlers/admin"
@@ -13,20 +12,25 @@ import (
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/store/admin"
 	"github.com/grvbrk/async0_server/migrations"
+	"github.com/rbcervilla/redisstore/v9"
+	"github.com/redis/go-redis/v9"
 )
 
-var (
-	authKey            = securecookie.GenerateRandomKey(64)
-	encryptionKey      = securecookie.GenerateRandomKey(32)
-	adminAuthKey       = securecookie.GenerateRandomKey(64)
-	adminEncryptionKey = securecookie.GenerateRandomKey(32)
-)
+// var (
+// 	authKey            = securecookie.GenerateRandomKey(64)
+// 	encryptionKey      = securecookie.GenerateRandomKey(32)
+// 	adminAuthKey       = securecookie.GenerateRandomKey(64)
+// 	adminEncryptionKey = securecookie.GenerateRandomKey(32)
+// )
 
 type Application struct {
-	Logger                *log.Logger
-	Oauth                 *auth.GoogleOauth
-	AdminOauth            *auth.AdminGoogleOauth
-	MiddlewareHandler     *middlewares.MiddlwareHandler
+	Logger      *log.Logger
+	redisClient *redis.Client
+
+	Oauth      *auth.GoogleOauth
+	AdminOauth *auth.AdminGoogleOauth
+
+	MiddlewareHandler     *middlewares.MiddlewareHandler
 	UserProblemHandler    *handlers.ProblemHandler
 	UserListHandler       *handlers.ListHandler
 	UserTestcaseHandler   *handlers.TestcaseHandler
@@ -41,9 +45,6 @@ type Application struct {
 func NewApplication() (*Application, error) {
 	logger := log.New(os.Stdout, "LOGGING: ", log.Ldate|log.Ltime)
 	adminLogger := log.New(os.Stdout, "ADMIN LOGGING: ", log.Ldate|log.Ltime)
-	sessionStore := sessions.NewCookieStore(authKey, encryptionKey)
-	adminSessionStore := sessions.NewCookieStore(adminAuthKey, adminEncryptionKey)
-	middlewareHandler := middlewares.NewMiddlewareHandler(logger, sessionStore)
 
 	pgDB, err := store.ConnectPGDB()
 	if err != nil {
@@ -59,7 +60,23 @@ func NewApplication() (*Application, error) {
 
 	logger.Println("Database migrated...")
 
-	// stores
+	redisClient, err := store.ConnectRedis()
+	if err != nil {
+		logger.Println("PANIC: Redis connection failed, exiting...")
+		panic(err)
+	}
+
+	logger.Println("Redis connected...")
+
+	sessionStore, err := redisstore.NewRedisStore(context.Background(), redisClient)
+	if err != nil {
+		logger.Println("PANIC: Redis session store failed, exiting...")
+		panic(err)
+	}
+
+	middlewareHandler := middlewares.NewMiddlewareHandler(logger, sessionStore)
+
+	// user stores
 	userStore := store.NewPostgresUserStore(pgDB)
 	problemStore := store.NewPostgresProblemStore(pgDB)
 	listStore := store.NewPostgresListStore(pgDB)
@@ -68,7 +85,6 @@ func NewApplication() (*Application, error) {
 	topicStore := store.NewPostgresTopicStore(pgDB)
 
 	// admin stores
-	// adminUserStore := admin.NewPostgresAdminUserStore(pgDB)
 	adminProblemStore := admin.NewPostgresAdminProblemStore(pgDB)
 	adminListStore := admin.NewPostgresAdminListStore(pgDB)
 	adminTopicStore := admin.NewPostgresAdminTopicStore(pgDB)
@@ -78,12 +94,12 @@ func NewApplication() (*Application, error) {
 		return nil, err
 	}
 
-	adminOauth, err := auth.NewAdminGoogleOauth(adminLogger, adminSessionStore, userStore)
+	adminOauth, err := auth.NewAdminGoogleOauth(adminLogger, sessionStore, userStore)
 	if err != nil {
 		return nil, err
 	}
 
-	// handlers
+	// user handlers
 	userProblemHandler := handlers.NewProblemHandler(problemStore, logger, oauth)
 	userListHandler := handlers.NewListHandler(listStore, logger, oauth)
 	userTestcaseHandler := handlers.NewTestcaseHandler(testcaseStore, logger, oauth)
@@ -96,9 +112,12 @@ func NewApplication() (*Application, error) {
 	adminTopicHandler := adminHandler.NewAdminTopicHandler(adminTopicStore, adminLogger, adminOauth)
 
 	app := &Application{
-		Logger:                logger,
-		Oauth:                 oauth,
-		AdminOauth:            adminOauth,
+		Logger:      logger,
+		redisClient: redisClient,
+
+		Oauth:      oauth,
+		AdminOauth: adminOauth,
+
 		MiddlewareHandler:     middlewareHandler,
 		UserProblemHandler:    userProblemHandler,
 		UserListHandler:       userListHandler,
