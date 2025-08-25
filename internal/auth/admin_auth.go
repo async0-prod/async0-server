@@ -10,10 +10,9 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/sessions"
-	"github.com/grvbrk/async0_server/internal/models"
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/utils"
+	"github.com/rbcervilla/redisstore/v9"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -27,17 +26,17 @@ type AdminOAuth interface {
 type AdminGoogleOauth struct {
 	Logger    *log.Logger
 	Config    *oauth2.Config
-	Store     *sessions.CookieStore
+	Store     *redisstore.RedisStore
 	UserStore *store.PostgresUserStore
 }
 
-func NewAdminGoogleOauth(logger *log.Logger, adminStore *sessions.CookieStore, userStore *store.PostgresUserStore) (*AdminGoogleOauth, error) {
+func NewAdminGoogleOauth(logger *log.Logger, adminStore *redisstore.RedisStore, userStore *store.PostgresUserStore) (*AdminGoogleOauth, error) {
 	return &AdminGoogleOauth{
 		Logger: logger,
 		Config: &oauth2.Config{
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID_ADMIN"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET_ADMIN"),
-			RedirectURL:  "http://localhost:8080/auth/admin/google/callback", // FIX
+			RedirectURL:  fmt.Sprintf("%s/auth/admin/google/callback", os.Getenv("FRONTEND_URL")),
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
 			Endpoint:     google.Endpoint,
 		},
@@ -49,17 +48,6 @@ func NewAdminGoogleOauth(logger *log.Logger, adminStore *sessions.CookieStore, u
 func (g *AdminGoogleOauth) Login(w http.ResponseWriter, r *http.Request) {
 	url := g.Config.AuthCodeURL("random-state-string", oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-}
-
-func (g *AdminGoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
-	session, _ := g.Store.Get(r, "session")
-	delete(session.Values, "admin_email")
-	err := session.Save(r, w)
-	if err != nil {
-		g.Logger.Println("Error saving admin session", err)
-	}
-
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (g *AdminGoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
@@ -111,73 +99,64 @@ func (g *AdminGoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 
 	userId = user.ID.String()
 
-	session, _ := g.Store.Get(r, "session")
+	session, _ := g.Store.Get(r, "admin_session")
 	session.Values["admin_email"] = userInfo.Email
 	session.Values["admin_id"] = userId
 	session.Values["admin_image"] = userInfo.Image
 	session.Values["admin_name"] = userInfo.Name
-	session.Options.Path = "/"
-	// session.Options.Secure = false
-	// session.Options.SameSite = http.SameSiteNoneMode
 
 	err = session.Save(r, w)
 	if err != nil {
 		g.Logger.Println("Error saving admin session", err)
 	}
 
-	http.Redirect(w, r, "http://localhost:3001/dashboard", http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s/dashboard", os.Getenv("FRONTEND_URL")), http.StatusSeeOther)
+}
+
+func (g *AdminGoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
+	session, _ := g.Store.Get(r, "session")
+	delete(session.Values, "admin_email")
+	err := session.Save(r, w)
+	if err != nil {
+		g.Logger.Println("Error saving admin session", err)
+	}
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (g *AdminGoogleOauth) AuthAdmin(w http.ResponseWriter, r *http.Request) {
-	session, err := g.Store.Get(r, "session")
-	if err != nil {
-		g.Logger.Println("Failed to decode admin session:", err)
-		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"Error": "Unauthorized"})
+	session, err := g.Store.Get(r, "admin_session")
+	if err != nil || session.IsNew {
+		g.Logger.Println("Error getting admin session", err)
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})
 		return
 	}
 
-	email, ok := session.Values["admin_email"].(string)
-	if !ok || email == "" {
-		g.Logger.Println("No admin email found in session")
-		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"Error": "Unauthorized"})
+	adminEmail, emailOk := session.Values["admin_email"].(string)
+	adminIDStr, idOk := session.Values["admin_id"].(string)
+	adminName, nameOk := session.Values["admin_name"].(string)
+	adminImage, imageOk := session.Values["admin_image"].(string)
+
+	if !emailOk || !idOk || !nameOk || !imageOk || adminEmail == "" || adminIDStr == "" || adminName == "" || adminImage == "" {
+		g.Logger.Println("Invalid or missing admin data in session")
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})
 		return
 	}
 
-	adminID, _ := session.Values["admin_id"].(string)
-	adminImage, _ := session.Values["admin_image"].(string)
-	adminName, _ := session.Values["admin_name"].(string)
-	utils.WriteJSON(w, http.StatusOK, utils.Envelope{
-		"admin_id":    adminID,
-		"admin_email": email,
-		"admin_image": adminImage,
-		"admin_name":  adminName,
-	})
-}
-
-func (g *AdminGoogleOauth) GetAdmin(r *http.Request) (*models.User, error) {
-	session, err := g.Store.Get(r, "session")
-
+	adminID, err := uuid.Parse(adminIDStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get session: %w", err)
+		g.Logger.Println("Invalid admin ID format in session:", err)
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})
+		return
 	}
 
-	adminEmail, ok := session.Values["admin_email"].(string)
-	if !ok || adminEmail == "" {
-		return nil, fmt.Errorf("no admin email found in session")
+	adminInfo := map[string]interface{}{
+		"id":    adminID,
+		"email": adminEmail,
+		"name":  adminName,
+		"image": adminImage,
+		"role":  "ADMIN",
 	}
 
-	id, ok := session.Values["admin_id"].(string)
-	if !ok || id == "" {
-		return nil, fmt.Errorf("no admin id found in session")
-	}
-
-	adminID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse admin id: %w", err)
-	}
-
-	return &models.User{
-		ID:    adminID,
-		Email: adminEmail,
-	}, nil
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": adminInfo})
 }
