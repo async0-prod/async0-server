@@ -10,8 +10,32 @@ import (
 
 func SetupRoutes(app *app.Application) *chi.Mux {
 	r := chi.NewRouter()
+
 	r.Use(httprate.LimitAll(200, time.Minute))
 	r.Use(app.MiddlewareHandler.RequestLogger)
+	r.Use(app.MiddlewareHandler.Security)
+
+	r.Route("/auth", func(r chi.Router) {
+
+		r.Use(httprate.LimitAll(100, time.Minute))
+
+		// Auth routes without CORS
+		r.Get("/google/login", app.Oauth.Login)
+		r.Get("/google/logout", app.Oauth.Logout)
+		r.Get("/google/callback", app.Oauth.Callback)
+
+		r.Get("/admin/google/login", app.AdminOauth.Login)
+		r.Get("/admin/google/logout", app.AdminOauth.Logout)
+		r.Get("/admin/google/callback", app.AdminOauth.Callback)
+
+		// Auth routes with CORS
+		r.Group(func(r chi.Router) {
+			r.Use(app.MiddlewareHandler.Cors)
+			r.Get("/user", app.Oauth.AuthUser)
+			r.Get("/admin", app.AdminOauth.AuthAdmin)
+
+		})
+	})
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(httprate.LimitAll(100, time.Minute))
@@ -27,7 +51,6 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		})
 
 		r.Route("/topics", func(r chi.Router) {
-			// r.Get("/", app.UserTopicHandler.HandlerGetAllTopics)
 			r.Get("/", app.UserTopicHandler.HandlerGetTopics)
 		})
 
@@ -36,7 +59,8 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		})
 
 		r.Route("/submissions", func(r chi.Router) {
-			r.Post("/run/{id}", app.UserSubmissionHandler.HandlerRunSubmission)
+			r.Use(app.MiddlewareHandler.Authenticate)
+			r.Post("/run", app.UserSubmissionHandler.HandlerRunSubmission)
 			r.Post("/submit/{id}", app.UserSubmissionHandler.HandlerSubmitSubmission)
 		})
 
@@ -45,6 +69,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(httprate.LimitAll(100, time.Minute))
 		r.Use(app.MiddlewareHandler.Cors)
+		r.Use(app.MiddlewareHandler.AuthenticateAdmin)
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", app.AdminProblemHandler.HandlerGetAllProblems)
