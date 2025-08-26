@@ -42,8 +42,8 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		r.Use(app.MiddlewareHandler.Cors)
 
 		r.Route("/problems", func(r chi.Router) {
-			r.Get("/list/{listID}", app.UserProblemHandler.HandlerGetListProblems)
-			r.Get("/slug/{slug}", app.UserProblemHandler.HandlerGetProblemBySlug)
+			r.Get("/table/{listID}", app.UserProblemHandler.HandlerGetTanstackTableProblems)
+			r.Get("/{slug}", app.UserProblemHandler.HandlerGetProblemBySlug)
 		})
 
 		r.Route("/lists", func(r chi.Router) {
@@ -51,7 +51,8 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		})
 
 		r.Route("/topics", func(r chi.Router) {
-			r.Get("/", app.UserTopicHandler.HandlerGetTopics)
+			r.Get("/", app.UserTopicHandler.HandlerGetAllTopics)
+			r.Get("/list/{listID}", app.UserTopicHandler.HandlerGetTopicsByListID)
 		})
 
 		r.Route("/testcases", func(r chi.Router) {
@@ -69,7 +70,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(httprate.LimitAll(100, time.Minute))
 		r.Use(app.MiddlewareHandler.Cors)
-		r.Use(app.MiddlewareHandler.AuthenticateAdmin)
+		// r.Use(app.MiddlewareHandler.AuthenticateAdmin)
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", app.AdminProblemHandler.HandlerGetAllProblems)

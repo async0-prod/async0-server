@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/grvbrk/async0_server/internal/auth"
+	"github.com/grvbrk/async0_server/internal/middlewares"
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/utils"
 )
@@ -44,7 +45,14 @@ func (ph *ProblemHandler) HandlerGetProblemBySlug(w http.ResponseWriter, r *http
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": problem})
 }
 
-func (ph *ProblemHandler) HandlerGetListProblems(w http.ResponseWriter, r *http.Request) {
+func (ph *ProblemHandler) HandlerGetTanstackTableProblems(w http.ResponseWriter, r *http.Request) {
+	var userID *uuid.UUID
+
+	user, ok := middlewares.GetUserFromContext(r)
+	if ok {
+		userID = &user.ID
+	}
+
 	id := chi.URLParam(r, "listID")
 	listID, err := uuid.Parse(id)
 	if err != nil {
@@ -53,12 +61,12 @@ func (ph *ProblemHandler) HandlerGetListProblems(w http.ResponseWriter, r *http.
 		return
 	}
 
-	problems, err := ph.ProblemStore.GetListProblems(listID)
+	tableProblems, err := ph.ProblemStore.GetTanstackTableProblemsByListID(userID, listID)
 	if err != nil {
-		ph.Logger.Println("Error getting list problems", err)
+		ph.Logger.Println("Error getting tanstack table problems", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": problems})
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": tableProblems})
 }
