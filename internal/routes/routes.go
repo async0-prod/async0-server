@@ -65,6 +65,11 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 			r.Post("/submit/{id}", app.UserSubmissionHandler.HandlerSubmitSubmission)
 		})
 
+		r.Route("/analytics", func(r chi.Router) {
+			// r.Use(app.MiddlewareHandler.Authenticate)
+			r.Get("/list/{listID}", app.UserAnalyticsHandler.HandlerGetCardAnalyticsByListID)
+		})
+
 	})
 
 	r.Route("/admin", func(r chi.Router) {
