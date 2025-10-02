@@ -19,10 +19,10 @@ func NewPostgresTestcaseStore(db *sql.DB) *PostgresTestcaseStore {
 }
 
 type TestcaseStore interface {
-	GetTestcaseByProblemID(problemID uuid.UUID) ([]models.Testcase, error)
+	GetTestcasesByProblemID(problemID uuid.UUID) ([]models.Testcase, error)
 }
 
-func (ps *PostgresTestcaseStore) GetTestcaseByProblemID(problemID uuid.UUID) ([]models.Testcase, error) {
+func (ps *PostgresTestcaseStore) GetTestcasesByProblemID(problemID uuid.UUID) ([]models.Testcase, error) {
 	query := `
 		SELECT
 			id,

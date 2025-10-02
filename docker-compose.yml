@@ -1,6 +1,6 @@
 services:
   db:
-    container_name: "async0-test"
+    container_name: "async0-test-db"
     image: postgres:12.4-alpine
     volumes:
       - "./database/postgres:/var/lib/postgresql/data:rw"
@@ -10,4 +10,13 @@ services:
       POSTGRES_DB: "async0"
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
+    restart: unless-stopped
+
+  redis:
+    container_name: "async0-test-redis"
+    image: redis:latest
+    volumes:
+      - "./database/redis:/var/lib/redis/data:rw"
+    ports:
+      - "6379:6379"
     restart: unless-stopped

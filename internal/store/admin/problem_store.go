@@ -8,33 +8,6 @@ import (
 	"github.com/grvbrk/async0_server/internal/models"
 )
 
-// {
-//     "name": "Two Sum",
-//     "slug": "two-sum",
-//     "link": "asaas",
-//     "difficulty": "Easy",
-//     "starter_code": {},
-//     "solution_code": {},
-//     "time_limit": 2000,
-//     "memory_limit": 256,
-//     "is_active": true,
-//     "topics": [
-//         "2ce5b4f9-7ebb-4ce8-9787-558c11ca86ad",
-//         "660b2f88-7b8f-4009-8cb5-184c45780cdf"
-//     ],
-//     "lists": [
-//         "daa215cc-c573-466e-94ec-902ec072c9f7",
-//         "7ab83b2c-66e8-4b00-9858-f340212e481a"
-//     ],
-//     "testCases": [
-//         {
-//             "name": "asas",
-//             "input": "asas",
-//             "output": "asas"
-//         }
-//     ]
-// }
-
 type AdminPostgresProblemStore struct {
 	DB *sql.DB
 }
@@ -47,14 +20,14 @@ func NewPostgresAdminProblemStore(db *sql.DB) *AdminPostgresProblemStore {
 
 type AdminProblemStore interface {
 	GetAllProblems() ([]models.Problem, error)
-	CreateProblem(models.Problem, []uuid.UUID, []uuid.UUID, []models.TestCase) error
+	CreateProblem(models.Problem, []uuid.UUID, []uuid.UUID, []models.Testcase, []models.Solution) error
 }
 
 func (ap *AdminPostgresProblemStore) GetAllProblems() ([]models.Problem, error) {
 	problems := []models.Problem{}
 
 	query := `
-		SELECT id, name, slug, link, problem_number, difficulty, starter_code, solution_code, time_limit, memory_limit, acceptance_rate, total_submissions, successful_submissions, is_active
+		SELECT id, name, slug, link, problem_number, difficulty, starter_code, time_limit, memory_limit, acceptance_rate, total_submissions, successful_submissions, is_active
 		FROM problems
 	`
 
@@ -67,7 +40,7 @@ func (ap *AdminPostgresProblemStore) GetAllProblems() ([]models.Problem, error) 
 
 	for rows.Next() {
 		problem := models.Problem{}
-		err := rows.Scan(&problem.ID, &problem.Name, &problem.Slug, &problem.Link, &problem.ProblemNumber, &problem.Difficulty, &problem.StarterCode, &problem.SolutionCode, &problem.TimeLimit, &problem.MemoryLimit, &problem.AcceptanceRate, &problem.TotalSubmissions, &problem.SuccessfulSubmissions, &problem.IsActive)
+		err := rows.Scan(&problem.ID, &problem.Name, &problem.Slug, &problem.Link, &problem.ProblemNumber, &problem.Difficulty, &problem.StarterCode, &problem.TimeLimit, &problem.MemoryLimit, &problem.AcceptanceRate, &problem.TotalSubmissions, &problem.SuccessfulSubmissions, &problem.IsActive)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +51,7 @@ func (ap *AdminPostgresProblemStore) GetAllProblems() ([]models.Problem, error) 
 	return problems, nil
 }
 
-func (ap *AdminPostgresProblemStore) CreateProblem(problem models.Problem, listIDs []uuid.UUID, topicIDs []uuid.UUID, testcases []models.TestCase) error {
+func (ap *AdminPostgresProblemStore) CreateProblem(problem models.Problem, listIDs []uuid.UUID, topicIDs []uuid.UUID, testcases []models.Testcase, solutions []models.Solution) error {
 
 	tx, err := ap.DB.Begin()
 	if err != nil {
@@ -92,12 +65,13 @@ func (ap *AdminPostgresProblemStore) CreateProblem(problem models.Problem, listI
 	}()
 
 	// insert problem
+	var problemID uuid.UUID
 	query := `
-		INSERT INTO problems (name, slug, link, difficulty, starter_code, solution_code, time_limit, memory_limit, is_active)
+		INSERT INTO problems (name, slug, description, link, difficulty, starter_code, time_limit, memory_limit, is_active)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
 		`
-	problemID, err := tx.Exec(query, problem.Name, problem.Slug, problem.Link, problem.Difficulty, problem.StarterCode, problem.SolutionCode, problem.TimeLimit, problem.MemoryLimit, problem.IsActive)
+	err = tx.QueryRow(query, problem.Name, problem.Slug, problem.Description, problem.Link, problem.Difficulty, problem.StarterCode, problem.TimeLimit, problem.MemoryLimit, problem.IsActive).Scan(&problemID)
 	if err != nil {
 		return fmt.Errorf("failed to insert problem: %w", err)
 	}
@@ -117,10 +91,10 @@ func (ap *AdminPostgresProblemStore) CreateProblem(problem models.Problem, listI
 	// insert into problem_lists
 	for _, listID := range listIDs {
 		query := `
-			INSERT INTO problem_lists (problem_id, list_id)
-			VALUES ($1, $2)
+			INSERT INTO list_problems (problem_id, list_id, position)
+			VALUES ($1, $2, $3)
 			`
-		_, err := tx.Exec(query, problemID, listID)
+		_, err := tx.Exec(query, problemID, listID, problem.ProblemNumber)
 		if err != nil {
 			return fmt.Errorf("failed to insert problem_lists: %w", err)
 		}
@@ -135,6 +109,22 @@ func (ap *AdminPostgresProblemStore) CreateProblem(problem models.Problem, listI
 		_, err := tx.Exec(query, problemID, testcase.UI, testcase.Input, testcase.Output, testcase.Position)
 		if err != nil {
 			return fmt.Errorf("failed to insert testcases: %w", err)
+		}
+
+	}
+
+	// insert solutions only if there is at least one
+
+	if len(solutions) > 0 {
+		for _, solution := range solutions {
+			query := `
+				INSERT INTO solutions (problem_id, title, hint, description, code, code_explanation, notes, time_complexity, space_complexity, difficulty_level, display_order, author, is_active)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+				`
+			_, err := tx.Exec(query, problemID, solution.Title, solution.Hint, solution.Description, solution.Code, solution.CodeExplanation, solution.Notes, solution.TimeComplexity, solution.SpaceComplexity, solution.DifficultyLevel, solution.DisplayOrder, solution.Author, solution.IsActive)
+			if err != nil {
+				return fmt.Errorf("failed to insert solutions: %w", err)
+			}
 		}
 	}
 

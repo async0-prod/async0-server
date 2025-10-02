@@ -36,7 +36,7 @@ func NewAdminGoogleOauth(logger *log.Logger, adminStore *redisstore.RedisStore, 
 		Config: &oauth2.Config{
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID_ADMIN"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET_ADMIN"),
-			RedirectURL:  fmt.Sprintf("%s/auth/admin/google/callback", os.Getenv("FRONTEND_URL")),
+			RedirectURL:  fmt.Sprintf("%s/auth/admin/google/callback", os.Getenv("BACKEND_URL")),
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
 			Endpoint:     google.Endpoint,
 		},
@@ -110,7 +110,7 @@ func (g *AdminGoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 		g.Logger.Println("Error saving admin session", err)
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("%s/dashboard", os.Getenv("FRONTEND_URL")), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s/", os.Getenv("FRONTEND_URL")), http.StatusSeeOther)
 }
 
 func (g *AdminGoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {

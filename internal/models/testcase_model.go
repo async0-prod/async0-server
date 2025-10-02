@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-type TestCase struct {
+type Testcase struct {
 	ID        uuid.UUID `json:"id"`
 	ProblemID uuid.UUID `json:"problem_id"`
 	UI        string    `json:"ui"`

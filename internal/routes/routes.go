@@ -61,6 +61,9 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 		r.Route("/submissions", func(r chi.Router) {
 			r.Use(app.MiddlewareHandler.Authenticate)
+
+			r.Get("/problem/{problemID}", app.UserSubmissionHandler.HandlerGetSubmissionsByProblemID)
+
 			r.Post("/run", app.UserSubmissionHandler.HandlerRunSubmission)
 			r.Post("/submit/{id}", app.UserSubmissionHandler.HandlerSubmitSubmission)
 		})

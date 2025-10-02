@@ -23,15 +23,13 @@ func NewAdminListHandler(adminListStore admin.AdminListStore, logger *log.Logger
 	}
 }
 
-func (al *AdminListHandler) HandlerGetAllLists(w http.ResponseWriter, r *http.Request) {
-
-	lists, err := al.AdminListStore.GetAllLists()
+func (ah *AdminListHandler) HandlerGetAllLists(w http.ResponseWriter, r *http.Request) {
+	lists, err := ah.AdminListStore.GetAllLists()
 	if err != nil {
-		al.Logger.Println("Error getting all lists from store", err)
+		ah.Logger.Println("Error getting all lists", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
 	}
 
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": lists})
-
 }

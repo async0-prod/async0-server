@@ -20,24 +20,24 @@ type AdminListStore interface {
 	GetAllLists() ([]models.List, error)
 }
 
-func (a *AdminPostgresListStore) GetAllLists() ([]models.List, error) {
-	lists := []models.List{}
-
+func (ap *AdminPostgresListStore) GetAllLists() ([]models.List, error) {
 	query := `
-		SELECT id, name, slug, COALESCE(link, '') AS link, COALESCE(author, '') AS author, total_problems, is_active, display_order, created_at, updated_at
+		SELECT id, name, slug, total_problems, is_active, display_order, created_at, updated_at
 		FROM lists
 	`
 
-	rows, err := a.DB.Query(query)
+	result, err := ap.DB.Query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer result.Close()
 
-	for rows.Next() {
+	lists := []models.List{}
+
+	for result.Next() {
 		list := models.List{}
-		err := rows.Scan(&list.ID, &list.Name, &list.Slug, &list.Link, &list.Author, &list.TotalProblems, &list.IsActive, &list.DisplayOrder, &list.CreatedAt, &list.UpdatedAt)
+		err := result.Scan(&list.ID, &list.Name, &list.Slug, &list.TotalProblems, &list.IsActive, &list.DisplayOrder, &list.CreatedAt, &list.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}

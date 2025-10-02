@@ -39,55 +39,44 @@ func (ap *AdminProblemHandler) HandlerGetAllProblems(w http.ResponseWriter, r *h
 }
 
 type TestCaseBody struct {
-	Name     string `json:"name"`
+	UI       string `json:"ui"`
 	Input    string `json:"input"`
 	Output   string `json:"output"`
 	Position int    `json:"position"`
 }
 
-type ProblemBody struct {
-	Name         string         `json:"name"`
-	Slug         string         `json:"slug"`
-	Link         string         `json:"link"`
-	Difficulty   string         `json:"difficulty"`
-	StarterCode  any            `json:"starter_code"`
-	SolutionCode any            `json:"solution_code"`
-	TimeLimit    int            `json:"time_limit"`
-	MemoryLimit  int            `json:"memory_limit"`
-	IsActive     bool           `json:"is_active"`
-	Topics       []string       `json:"topics"`
-	Lists        []string       `json:"lists"`
-	TestCases    []TestCaseBody `json:"test_cases"`
+type SolutionBody struct {
+	Title           string `json:"title"`
+	Hint            string `json:"hint"`
+	Description     string `json:"description"`
+	Code            string `json:"code"`
+	CodeExplanation string `json:"code_explanation"`
+	Notes           string `json:"notes"`
+	TimeComplexity  string `json:"time_complexity"`
+	SpaceComplexity string `json:"space_complexity"`
+	DifficultyLevel string `json:"difficulty_level"`
+	DisplayOrder    int    `json:"display_order"`
+	Author          string `json:"author"`
+	IsActive        bool   `json:"is_active"`
 }
 
-// {
-//     "name": "Two Sum",
-//     "slug": "two-sum",
-//     "link": "asaas",
-//     "difficulty": "Easy",
-//     "starter_code": {},
-//     "solution_code": {},
-//     "time_limit": 2000,
-//     "memory_limit": 256,
-//     "is_active": true,
-//     "topics": [
-//         "2ce5b4f9-7ebb-4ce8-9787-558c11ca86ad",
-//         "660b2f88-7b8f-4009-8cb5-184c45780cdf"
-//     ],
-//     "lists": [
-//         "daa215cc-c573-466e-94ec-902ec072c9f7",
-//         "7ab83b2c-66e8-4b00-9858-f340212e481a"
-//     ],
-//     "testCases": [
-//         {
-//             "name": "asas",
-//             "input": "asas",
-//             "output": "asas",
-// 						"position": 1,
-
-//         }
-//     ]
-// }
+type ProblemBody struct {
+	Name          string         `json:"name"`
+	ProblemNumber *int           `json:"problem_number"`
+	Slug          string         `json:"slug"`
+	Description   string         `json:"description"`
+	Link          string         `json:"link"`
+	Difficulty    string         `json:"difficulty"`
+	StarterCode   any            `json:"starter_code"`
+	SolutionCode  any            `json:"solution_code"`
+	TimeLimit     int            `json:"time_limit"`
+	MemoryLimit   int            `json:"memory_limit"`
+	IsActive      bool           `json:"is_active"`
+	Topics        []string       `json:"topics"`
+	Lists         []string       `json:"lists"`
+	TestCases     []TestCaseBody `json:"testcases"`
+	Solutions     []SolutionBody `json:"solutions"`
+}
 
 func (ap *AdminProblemHandler) HandlerCreateProblem(w http.ResponseWriter, r *http.Request) {
 	var problemBody ProblemBody
@@ -99,15 +88,17 @@ func (ap *AdminProblemHandler) HandlerCreateProblem(w http.ResponseWriter, r *ht
 	}
 
 	problem := models.Problem{
-		Name:         problemBody.Name,
-		Slug:         problemBody.Slug,
-		Link:         problemBody.Link,
-		Difficulty:   problemBody.Difficulty,
-		StarterCode:  problemBody.StarterCode,
-		SolutionCode: problemBody.SolutionCode,
-		TimeLimit:    problemBody.TimeLimit,
-		MemoryLimit:  problemBody.MemoryLimit,
-		IsActive:     problemBody.IsActive,
+		Name:          problemBody.Name,
+		ProblemNumber: problemBody.ProblemNumber,
+		Slug:          problemBody.Slug,
+		Description:   problemBody.Description,
+		Link:          problemBody.Link,
+		Difficulty:    problemBody.Difficulty,
+		StarterCode:   problemBody.StarterCode,
+		SolutionCode:  problemBody.SolutionCode,
+		TimeLimit:     problemBody.TimeLimit,
+		MemoryLimit:   problemBody.MemoryLimit,
+		IsActive:      problemBody.IsActive,
 	}
 
 	var topicIDs []uuid.UUID
@@ -134,17 +125,35 @@ func (ap *AdminProblemHandler) HandlerCreateProblem(w http.ResponseWriter, r *ht
 		listIDs = append(listIDs, listID)
 	}
 
-	var testcases []models.TestCase
-	for _, testCase := range problemBody.TestCases {
-		testcases = append(testcases, models.TestCase{
-			UI:       testCase.Name,
-			Input:    testCase.Input,
-			Output:   testCase.Output,
-			Position: testCase.Position,
+	var testcases []models.Testcase
+	for _, tc := range problemBody.TestCases {
+		testcases = append(testcases, models.Testcase{
+			UI:       tc.UI,
+			Input:    tc.Input,
+			Output:   tc.Output,
+			Position: tc.Position,
 		})
 	}
 
-	err = ap.AdminProblemStore.CreateProblem(problem, listIDs, topicIDs, testcases)
+	var solutions []models.Solution
+	for _, solution := range problemBody.Solutions {
+		solutions = append(solutions, models.Solution{
+			Title:           solution.Title,
+			Hint:            solution.Hint,
+			Description:     solution.Description,
+			Code:            solution.Code,
+			CodeExplanation: solution.CodeExplanation,
+			Notes:           solution.Notes,
+			TimeComplexity:  solution.TimeComplexity,
+			SpaceComplexity: solution.SpaceComplexity,
+			DifficultyLevel: solution.DifficultyLevel,
+			DisplayOrder:    solution.DisplayOrder,
+			Author:          solution.Author,
+			IsActive:        solution.IsActive,
+		})
+	}
+
+	err = ap.AdminProblemStore.CreateProblem(problem, listIDs, topicIDs, testcases, solutions)
 	if err != nil {
 		ap.Logger.Println("Error creating problem", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})

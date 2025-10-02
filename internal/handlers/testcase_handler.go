@@ -35,7 +35,7 @@ func (ph *TestcaseHandler) HandlerGetTestcaseByProblemID(w http.ResponseWriter, 
 		return
 	}
 
-	testcase, err := ph.TestcaseStore.GetTestcaseByProblemID(problemID)
+	testcase, err := ph.TestcaseStore.GetTestcasesByProblemID(problemID)
 	if err != nil {
 		ph.Logger.Println("Error getting testcase by slug", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})

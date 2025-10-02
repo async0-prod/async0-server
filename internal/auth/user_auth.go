@@ -36,9 +36,9 @@ func NewGoogleOauth(logger *log.Logger, store *redisstore.RedisStore, userStore 
 	return &GoogleOauth{
 		Logger: logger,
 		Config: &oauth2.Config{
-			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-			RedirectURL:  fmt.Sprintf("%s/auth/google/callback", os.Getenv("FRONTEND_URL")),
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID_USER"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET_USER"),
+			RedirectURL:  fmt.Sprintf("%s/auth/google/callback", os.Getenv("BACKEND_URL")),
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
 			Endpoint:     google.Endpoint,
 		},
@@ -126,7 +126,7 @@ func (g *GoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectURL := os.Getenv("FRONTEND_URL") + "/dashboard"
+	redirectURL := os.Getenv("FRONTEND_URL") + "/problems"
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 

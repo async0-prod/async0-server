@@ -10,6 +10,7 @@ type Problem struct {
 	ID                    uuid.UUID `json:"id"`
 	Name                  string    `json:"name"`
 	Slug                  string    `json:"slug"`
+	Description           string    `json:"description"`
 	Link                  string    `json:"link,omitempty"`
 	ProblemNumber         *int      `json:"problem_number,omitempty"`
 	Difficulty            string    `json:"difficulty"`

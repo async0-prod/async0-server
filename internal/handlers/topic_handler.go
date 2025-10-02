@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/grvbrk/async0_server/internal/auth"
 	"github.com/grvbrk/async0_server/internal/models"
@@ -26,9 +27,9 @@ func NewTopicHandler(topicStore store.TopicStore, logger *log.Logger, oauth *aut
 	}
 }
 
-func (th *TopicHandler) HandlerGetTopics(w http.ResponseWriter, r *http.Request) {
-	// Extract and validate list_id
-	listIDStr := r.URL.Query().Get("list_id")
+func (th *TopicHandler) HandlerGetTopicsByListID(w http.ResponseWriter, r *http.Request) {
+
+	listIDStr := chi.URLParam(r, "listID")
 	if listIDStr == "" {
 		th.Logger.Printf("Missing required parameter: list_id")
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{
@@ -89,6 +90,19 @@ func (th *TopicHandler) HandlerGetTopics(w http.ResponseWriter, r *http.Request)
 
 	if topics == nil {
 		topics = []store.TopicsWithProblems{}
+	}
+
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": topics})
+}
+
+func (th *TopicHandler) HandlerGetAllTopics(w http.ResponseWriter, r *http.Request) {
+	topics, err := th.TopicStore.GetAllTopics()
+	if err != nil {
+		th.Logger.Printf("Error getting topics: %v", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{
+			"error": "Internal Server Error",
+		})
+		return
 	}
 
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": topics})

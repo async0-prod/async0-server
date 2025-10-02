@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS lists (
 CREATE TABLE IF NOT EXISTS problems (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
   slug VARCHAR(120) NOT NULL UNIQUE,
   link VARCHAR(255),
   problem_number INTEGER UNIQUE,

@@ -35,6 +35,7 @@ type TopicsWithProblems struct {
 type TopicStore interface {
 	GetAllTopicsByListID(listID uuid.UUID) ([]models.Topic, error)
 	GetAllTopicsAndProblemsByListID(listID uuid.UUID) ([]TopicsWithProblems, error)
+	GetAllTopics() ([]models.Topic, error)
 }
 
 func (ps *PostgresTopicStore) GetAllTopicsByListID(listID uuid.UUID) ([]models.Topic, error) {
@@ -151,6 +152,49 @@ func (ps *PostgresTopicStore) GetAllTopicsAndProblemsByListID(listID uuid.UUID) 
 			Name:     topicName,
 			Problems: problems,
 		})
+	}
+
+	return topics, nil
+}
+
+func (ps *PostgresTopicStore) GetAllTopics() ([]models.Topic, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			slug,
+			is_active,
+			display_order,
+			created_at,
+			updated_at
+		FROM topics
+	`
+
+	rows, err := ps.DB.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute query to get all topics: %w", err)
+	}
+
+	defer rows.Close()
+
+	topics := []models.Topic{}
+	for rows.Next() {
+		var topic models.Topic
+		err := rows.Scan(
+			&topic.ID,
+			&topic.Name,
+			&topic.Slug,
+			&topic.IsActive,
+			&topic.DisplayOrder,
+			&topic.CreatedAt,
+			&topic.UpdatedAt,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+
+		topics = append(topics, topic)
 	}
 
 	return topics, nil

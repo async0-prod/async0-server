@@ -11,7 +11,6 @@ import (
 	"github.com/grvbrk/async0_server/internal/middlewares"
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/store/admin"
-	"github.com/grvbrk/async0_server/migrations"
 	"github.com/rbcervilla/redisstore/v9"
 	"github.com/redis/go-redis/v9"
 )
@@ -40,6 +39,8 @@ type Application struct {
 	AdminProblemHandler *adminHandler.AdminProblemHandler
 	AdminListHandler    *adminHandler.AdminListHandler
 	AdminTopicHandler   *adminHandler.AdminTopicHandler
+
+	UserAnalyticsHandler *handlers.AnalyticsHandler
 }
 
 func NewApplication() (*Application, error) {
@@ -52,13 +53,13 @@ func NewApplication() (*Application, error) {
 		return nil, err
 	}
 
-	err = store.MigrateFS(pgDB, migrations.FS, "db")
-	if err != nil {
-		logger.Println("PANIC: Postgresql migration failed, exiting...")
-		panic(err)
-	}
+	// err = store.MigrateFS(pgDB, migrations.FS, "db")
+	// if err != nil {
+	// 	logger.Println("PANIC: Postgresql migration failed, exiting...")
+	// 	panic(err)
+	// }
 
-	logger.Println("Database migrated...")
+	// logger.Println("Database migrated...")
 
 	redisClient, err := store.ConnectRedis()
 	if err != nil {
@@ -74,6 +75,8 @@ func NewApplication() (*Application, error) {
 		panic(err)
 	}
 
+	logger.Println("Redis session store connected...")
+
 	middlewareHandler := middlewares.NewMiddlewareHandler(logger, sessionStore)
 
 	// user stores
@@ -88,6 +91,9 @@ func NewApplication() (*Application, error) {
 	adminProblemStore := admin.NewPostgresAdminProblemStore(pgDB)
 	adminListStore := admin.NewPostgresAdminListStore(pgDB)
 	adminTopicStore := admin.NewPostgresAdminTopicStore(pgDB)
+
+	// analytics store
+	analyticsStore := store.NewPostgresAnalyticsStore(pgDB)
 
 	oauth, err := auth.NewGoogleOauth(logger, sessionStore, userStore)
 	if err != nil {
@@ -111,6 +117,9 @@ func NewApplication() (*Application, error) {
 	adminListHandler := adminHandler.NewAdminListHandler(adminListStore, adminLogger, adminOauth)
 	adminTopicHandler := adminHandler.NewAdminTopicHandler(adminTopicStore, adminLogger, adminOauth)
 
+	// analytics handlers
+	userAnalyticsHandler := handlers.NewAnalyticsHandler(logger, oauth, analyticsStore)
+
 	app := &Application{
 		Logger:      logger,
 		redisClient: redisClient,
@@ -128,6 +137,8 @@ func NewApplication() (*Application, error) {
 		AdminProblemHandler: adminProblemHandler,
 		AdminListHandler:    adminListHandler,
 		AdminTopicHandler:   adminTopicHandler,
+
+		UserAnalyticsHandler: userAnalyticsHandler,
 	}
 
 	return app, nil

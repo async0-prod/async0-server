@@ -7,12 +7,14 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/grvbrk/async0_server/internal/auth"
+	"github.com/grvbrk/async0_server/internal/middlewares"
 	"github.com/grvbrk/async0_server/internal/models"
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/utils"
@@ -49,24 +51,6 @@ type Judge0Result struct {
 	Status        Status  `json:"status"`
 }
 
-type TestcaseResult struct {
-	TCPass           bool   `json:"tc_pass"`
-	TCStatusID       int    `json:"tc_status_id"`
-	TCStatus         string `json:"tc_status"`
-	TCTime           string `json:"tc_time"`
-	TCMemory         int    `json:"tc_memory"`
-	TCOutput         string `json:"tc_output"`
-	TCExpectedOutput string `json:"tc_expected_output"`
-}
-
-type SubmitSubmissionResponse struct {
-	OverallStatusID  int              `json:"overall_status_id"`
-	OverallStatus    string           `json:"overall_status"`
-	PassedTestcases  int              `json:"passed_testcases"`
-	TotalTestcases   int              `json:"total_testcases"`
-	TestcasesResults []TestcaseResult `json:"testcases_results"`
-}
-
 type RunSubmissionResponse struct {
 	StatusID     string `json:"status_id"`
 	StatusDesc   string `json:"status_description"`
@@ -90,7 +74,41 @@ func NewSubmissionHandler(submissionStore store.SubmissionStore, testcaseStore s
 	}
 }
 
+func (ph *SubmissionHandler) HandlerGetSubmissionsByProblemID(w http.ResponseWriter, r *http.Request) {
+
+	user, ok := middlewares.GetUserFromContext(r)
+	if !ok {
+		ph.Logger.Println("No user found in context. Sending an empty array of submissions")
+		utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": []models.Submission{}})
+		return
+	}
+
+	problemID, err := uuid.Parse(chi.URLParam(r, "problemID"))
+	if err != nil {
+		ph.Logger.Println("Error parsing problem id", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"message": "Bad Request"})
+		return
+	}
+
+	submissions, err := ph.SubmissionStore.GetSubmissionsByProblemID(user.ID, problemID)
+	if err != nil {
+		ph.Logger.Println("Error getting submissions by problem id", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": submissions})
+
+}
+
 func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *http.Request) {
+
+	// user, ok := middlewares.GetUserFromContext(r)
+	// if !ok {
+	// 	ph.Logger.Println("No user found in context")
+	// 	utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authorized"})
+	// 	return
+	// }
 
 	id := chi.URLParam(r, "id")
 	problemID, err := uuid.Parse(id)
@@ -153,7 +171,7 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	resp, err := http.Post("http://192.168.1.43:2358/submissions/batch?base64_encoded=false&wait=false", "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := http.Post(fmt.Sprintf("%s/submissions/batch?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer([]byte(jsonBody)))
 	if err != nil {
 		ph.Logger.Println("Error submitting batch request", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
@@ -183,6 +201,13 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 
 	result := formatMultipleJudge0Results(results, testcases)
 
+	// err = ph.SubmissionStore.CreateSubmission(user.ID, problemID, body.Code, result)
+	// if err != nil {
+	// 	ph.Logger.Println("Error creating submission", err)
+	// 	utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
+	// 	return
+	// }
+
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": result})
 
 }
@@ -193,7 +218,7 @@ func pollJudge0BatchResults(tokens []string) ([]Judge0Result, error) {
 	baseDelay := 500 * time.Millisecond
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := http.Get(fmt.Sprintf("%s/submissions/batch?tokens=%s&base64_encoded=false", "http://192.168.1.43:2358/", tokensParam))
+		resp, err := http.Get(fmt.Sprintf("%s/submissions/batch?tokens=%s&base64_encoded=false", os.Getenv("JUDGE0_URL"), tokensParam))
 		if err != nil {
 			return nil, fmt.Errorf("error sending get request: %w", err)
 		}
@@ -241,9 +266,9 @@ func pollJudge0BatchResults(tokens []string) ([]Judge0Result, error) {
 	return nil, fmt.Errorf("polling timeout exceeded")
 }
 
-func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Testcase) SubmitSubmissionResponse {
+func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Testcase) models.SubmitSubmissionResponse {
 	passedTests := 0
-	formattedResults := make([]TestcaseResult, len(results))
+	formattedResults := make([]models.TestcaseResult, len(results))
 
 	statusDescriptions := map[int]string{
 		1:  "In Queue",
@@ -289,7 +314,7 @@ func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Test
 			tcMemory = *result.Memory
 		}
 
-		formattedResults[i] = TestcaseResult{
+		formattedResults[i] = models.TestcaseResult{
 			TCPass:           passed,
 			TCStatusID:       result.Status.ID,
 			TCStatus:         statusDesc,
@@ -301,13 +326,13 @@ func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Test
 	}
 
 	overallStatusID := 4
-	overallStatus := "FAILED"
+	overallStatus := models.StatusRE
 	if passedTests == len(results) {
 		overallStatusID = 3
-		overallStatus = "ACCEPTED"
+		overallStatus = models.StatusAC
 	}
 
-	return SubmitSubmissionResponse{
+	return models.SubmitSubmissionResponse{
 		OverallStatusID:  overallStatusID,
 		OverallStatus:    overallStatus,
 		PassedTestcases:  passedTests,
@@ -338,7 +363,7 @@ func (ph *SubmissionHandler) HandlerRunSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	resp, err := http.Post("http://192.168.1.43:2358/submissions?base64_encoded=false&wait=false", "application/json", bytes.NewBuffer([]byte(jsonBody)))
+	resp, err := http.Post(fmt.Sprintf("%s/submissions?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer([]byte(jsonBody)))
 	if err != nil {
 		ph.Logger.Println("Error submitting request", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
@@ -375,7 +400,7 @@ func pollJudge0SingleResult(token string) (Judge0Result, error) {
 	baseDelay := 500 * time.Millisecond
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := http.Get(fmt.Sprintf("http://192.168.1.43:2358/submissions/%s?base64_encoded=false", token))
+		resp, err := http.Get(fmt.Sprintf("%s/submissions/%s?base64_encoded=false", os.Getenv("JUDGE0_URL"), token))
 		if err != nil {
 			return Judge0Result{}, fmt.Errorf("error sending get request: %w", err)
 		}

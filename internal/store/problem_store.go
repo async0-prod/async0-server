@@ -37,7 +37,7 @@ type ProblemStore interface {
 
 func (p *PostgresProblemStore) GetProblemBySlug(slug string) (*models.Problem, error) {
 	query := `
-		SELECT id, name, slug, link, problem_number, difficulty, starter_code, time_limit, memory_limit, acceptance_rate, total_submissions, successful_submissions, is_active
+		SELECT id, name, slug, description, link, problem_number, difficulty, starter_code, time_limit, memory_limit, acceptance_rate, total_submissions, successful_submissions, is_active
 		FROM problems
 		WHERE slug = $1
 	`
@@ -47,6 +47,7 @@ func (p *PostgresProblemStore) GetProblemBySlug(slug string) (*models.Problem, e
 		&problem.ID,
 		&problem.Name,
 		&problem.Slug,
+		&problem.Description,
 		&problem.Link,
 		&problem.ProblemNumber,
 		&problem.Difficulty,
