@@ -1,13 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/grvbrk/async0_server/internal/app"
 	"github.com/grvbrk/async0_server/internal/routes"
-	"github.com/joho/godotenv"
+	// "github.com/joho/godotenv"
 )
 
 const (
@@ -15,11 +14,11 @@ const (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("PANIC: Error loading env")
-		panic(err)
-	}
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	fmt.Println("PANIC: Error loading env")
+	// 	panic(err)
+	// }
 
 	app, err := app.NewApplication()
 	if err != nil {

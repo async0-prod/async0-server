@@ -10,15 +10,15 @@ RUN go mod download
 COPY main.go .
 COPY internal/ internal/
 # COPY migrations/ migrations/
-RUN CGO_ENABLED=0 GOOS=linux go build -o nazrein
+RUN CGO_ENABLED=0 GOOS=linux go build -o async0
 
 FROM gcr.io/distroless/base-debian12:nonroot
 WORKDIR /app
 
 # Copy the Doppler binary from builder stage
 COPY --from=builder /usr/local/bin/doppler /usr/local/bin/doppler
-COPY --from=builder /build/nazrein .
+COPY --from=builder /build/async0 .
 # COPY --from=builder /build/migrations ./migrations
 
 USER nonroot:nonroot
-CMD ["doppler", "run", "--", "/app/nazrein"]
+CMD ["doppler", "run", "--", "/app/async0"]
