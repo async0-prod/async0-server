@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-func ConnectPGDB() (*sql.DB, error) {
+func ConnectPGDB(logger *log.Logger) (*sql.DB, error) {
 	dsn := os.Getenv("DB_URL")
 	var db *sql.DB
 	var err error
@@ -20,20 +21,19 @@ func ConnectPGDB() (*sql.DB, error) {
 	for i := 1; i <= 10; i++ {
 		db, err = sql.Open("pgx", dsn)
 		if err != nil {
-			fmt.Printf("Attempt %d: failed to open DB: %v\n", i, err)
+			logger.Printf("Attempt %d: failed to open DB: %v\n", i, err)
 		} else {
 			err = db.Ping()
 			if err == nil {
-				fmt.Println("Connected to Database!")
 				return db, nil
 			}
-			fmt.Printf("Attempt %d: DB not ready: %v\n", i, err)
+			logger.Printf("Attempt %d: DB not ready: %v\n", i, err)
 		}
 
 		time.Sleep(3 * time.Second)
 	}
 
-	// All retries failed
+	logger.Printf("Could not connect to database after multiple attempts: %v", err)
 	return nil, fmt.Errorf("could not connect to database after multiple attempts: %w", err)
 }
 

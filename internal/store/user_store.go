@@ -94,3 +94,32 @@ func (pg *PostgresUserStore) GetUserByGoogleID(id string) (*models.User, error) 
 
 	return user, nil
 }
+
+func (pg *PostgresUserStore) GetUserByEmail(email string) (*models.User, error) {
+	user := &models.User{}
+
+	query := `
+	SELECT id, google_id, name, email, image, role
+	FROM users
+	WHERE email = $1
+	`
+
+	err := pg.db.QueryRow(query, email).Scan(
+		&user.ID,
+		&user.GoogleID,
+		&user.Name,
+		&user.Email,
+		&user.ImageSrc,
+		&user.Role,
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("error running get user by email query: %w", err)
+	}
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("no user found with email: %s", email)
+	}
+
+	return user, nil
+}

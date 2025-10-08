@@ -62,7 +62,7 @@ func (g *AdminGoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 	client := g.Config.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil {
-		g.Logger.Println("Error getting user info", err)
+		g.Logger.Println("Error getting admin info", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"Error": "Internal Server Error"})
 		return
 	}
@@ -110,32 +110,41 @@ func (g *AdminGoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 		g.Logger.Println("Error saving admin session", err)
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("%s/", os.Getenv("FRONTEND_URL")), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("%s/problems", os.Getenv("ADMIN_FRONTEND_URL")), http.StatusSeeOther)
 }
 
 func (g *AdminGoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
-	session, _ := g.Store.Get(r, "session")
-	delete(session.Values, "admin_email")
+	session, _ := g.Store.Get(r, "admin_session")
+
+	for key := range session.Values {
+		delete(session.Values, key)
+	}
+
+	session.Options.MaxAge = -1
+
 	err := session.Save(r, w)
 	if err != nil {
 		g.Logger.Println("Error saving admin session", err)
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	redirectURL := os.Getenv("ADMIN_FRONTEND_URL")
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (g *AdminGoogleOauth) AuthAdmin(w http.ResponseWriter, r *http.Request) {
-	session, err := g.Store.Get(r, "admin_session")
-	if err != nil || session.IsNew {
+	admin, err := g.Store.Get(r, "admin_session")
+	if err != nil {
 		g.Logger.Println("Error getting admin session", err)
 		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})
 		return
 	}
 
-	adminEmail, emailOk := session.Values["admin_email"].(string)
-	adminIDStr, idOk := session.Values["admin_id"].(string)
-	adminName, nameOk := session.Values["admin_name"].(string)
-	adminImage, imageOk := session.Values["admin_image"].(string)
+	adminEmail, emailOk := admin.Values["admin_email"].(string)
+	adminIDStr, idOk := admin.Values["admin_id"].(string)
+	adminName, nameOk := admin.Values["admin_name"].(string)
+	adminImage, imageOk := admin.Values["admin_image"].(string)
+
+	fmt.Println(adminEmail, emailOk, adminIDStr, idOk, adminName, nameOk, adminImage, imageOk)
 
 	if !emailOk || !idOk || !nameOk || !imageOk || adminEmail == "" || adminIDStr == "" || adminName == "" || adminImage == "" {
 		g.Logger.Println("Invalid or missing admin data in session")

@@ -36,9 +36,11 @@ type Application struct {
 	UserSubmissionHandler *handlers.SubmissionHandler
 	UserTopicHandler      *handlers.TopicHandler
 
-	AdminProblemHandler *adminHandler.AdminProblemHandler
-	AdminListHandler    *adminHandler.AdminListHandler
-	AdminTopicHandler   *adminHandler.AdminTopicHandler
+	AdminProblemHandler  *adminHandler.AdminProblemHandler
+	AdminListHandler     *adminHandler.AdminListHandler
+	AdminTopicHandler    *adminHandler.AdminTopicHandler
+	AdminTestcaseHandler *adminHandler.AdminTestcaseHandler
+	AdminSolutionHandler *adminHandler.AdminSolutionHandler
 
 	UserAnalyticsHandler *handlers.AnalyticsHandler
 }
@@ -47,11 +49,13 @@ func NewApplication() (*Application, error) {
 	logger := log.New(os.Stdout, "LOGGING: ", log.Ldate|log.Ltime)
 	adminLogger := log.New(os.Stdout, "ADMIN LOGGING: ", log.Ldate|log.Ltime)
 
-	pgDB, err := store.ConnectPGDB()
+	pgDB, err := store.ConnectPGDB(logger)
 	if err != nil {
 		logger.Println("Error connecting to db")
 		return nil, err
 	}
+
+	logger.Println("Database connected...")
 
 	// err = store.MigrateFS(pgDB, migrations.FS, "db")
 	// if err != nil {
@@ -91,6 +95,8 @@ func NewApplication() (*Application, error) {
 	adminProblemStore := admin.NewPostgresAdminProblemStore(pgDB)
 	adminListStore := admin.NewPostgresAdminListStore(pgDB)
 	adminTopicStore := admin.NewPostgresAdminTopicStore(pgDB)
+	adminTestcaseStore := admin.NewPostgresAdminTestcaseStore(pgDB)
+	adminSolutionStore := admin.NewPostgresAdminSolutionStore(pgDB)
 
 	// analytics store
 	analyticsStore := store.NewPostgresAnalyticsStore(pgDB)
@@ -116,6 +122,8 @@ func NewApplication() (*Application, error) {
 	adminProblemHandler := adminHandler.NewAdminProblemHandler(adminProblemStore, adminLogger, adminOauth)
 	adminListHandler := adminHandler.NewAdminListHandler(adminListStore, adminLogger, adminOauth)
 	adminTopicHandler := adminHandler.NewAdminTopicHandler(adminTopicStore, adminLogger, adminOauth)
+	adminTestcaseHandler := adminHandler.NewAdminTestcaseHandler(adminTestcaseStore, adminLogger, adminOauth)
+	adminSolutionHandler := adminHandler.NewAdminSolutionHandler(adminSolutionStore, adminLogger, adminOauth)
 
 	// analytics handlers
 	userAnalyticsHandler := handlers.NewAnalyticsHandler(logger, oauth, analyticsStore)
@@ -134,9 +142,11 @@ func NewApplication() (*Application, error) {
 		UserSubmissionHandler: userSubmissionHandler,
 		UserTopicHandler:      userTopicHandler,
 
-		AdminProblemHandler: adminProblemHandler,
-		AdminListHandler:    adminListHandler,
-		AdminTopicHandler:   adminTopicHandler,
+		AdminProblemHandler:  adminProblemHandler,
+		AdminListHandler:     adminListHandler,
+		AdminTopicHandler:    adminTopicHandler,
+		AdminTestcaseHandler: adminTestcaseHandler,
+		AdminSolutionHandler: adminSolutionHandler,
 
 		UserAnalyticsHandler: userAnalyticsHandler,
 	}

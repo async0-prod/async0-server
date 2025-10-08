@@ -24,6 +24,7 @@ type AnalyticsStore interface {
 }
 
 func (pg *PostgresAnalyticsStore) GetCardAnalyticsByListID(userID uuid.UUID, listID uuid.UUID) (models.CardAnalytics, error) {
+
 	query := `
 	SELECT
 		l.name,

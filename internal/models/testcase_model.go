@@ -16,3 +16,10 @@ type Testcase struct {
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+type TestcaseBasic struct {
+	ID     uuid.UUID `json:"id"`
+	UI     string    `json:"ui"`
+	Input  string    `json:"input"`
+	Output string    `json:"output"`
+}

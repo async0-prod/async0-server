@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -48,6 +49,8 @@ func (h *AnalyticsHandler) HandlerGetCardAnalyticsByListID(w http.ResponseWriter
 		utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": analytics})
 		return
 	}
+
+	fmt.Println(user.ID, "reached ere")
 
 	analytics, err := h.AnalyticsStore.GetCardAnalyticsByListID(user.ID, listID)
 	if err != nil {

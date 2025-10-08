@@ -103,12 +103,12 @@ func (ph *SubmissionHandler) HandlerGetSubmissionsByProblemID(w http.ResponseWri
 
 func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *http.Request) {
 
-	// user, ok := middlewares.GetUserFromContext(r)
-	// if !ok {
-	// 	ph.Logger.Println("No user found in context")
-	// 	utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authorized"})
-	// 	return
-	// }
+	user, ok := middlewares.GetUserFromContext(r)
+	if !ok {
+		ph.Logger.Println("No user found in context")
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authorized"})
+		return
+	}
 
 	id := chi.URLParam(r, "id")
 	problemID, err := uuid.Parse(id)
@@ -201,12 +201,12 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 
 	result := formatMultipleJudge0Results(results, testcases)
 
-	// err = ph.SubmissionStore.CreateSubmission(user.ID, problemID, body.Code, result)
-	// if err != nil {
-	// 	ph.Logger.Println("Error creating submission", err)
-	// 	utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
-	// 	return
-	// }
+	err = ph.SubmissionStore.CreateSubmission(user.ID, problemID, body.Code, result)
+	if err != nil {
+		ph.Logger.Println("Error creating submission", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
+		return
+	}
 
 	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": result})
 

@@ -69,7 +69,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		})
 
 		r.Route("/analytics", func(r chi.Router) {
-			// r.Use(app.MiddlewareHandler.Authenticate)
+			r.Use(app.MiddlewareHandler.Authenticate)
 			r.Get("/list/{listID}", app.UserAnalyticsHandler.HandlerGetCardAnalyticsByListID)
 		})
 
@@ -82,16 +82,27 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", app.AdminProblemHandler.HandlerGetAllProblems)
+			r.Get("/{id}", app.AdminProblemHandler.HandlerGetProblemByID)
 			r.Post("/", app.AdminProblemHandler.HandlerCreateProblem)
-
+			r.Put("/{id}", app.AdminProblemHandler.HandlerUpdateProblem)
 		})
 
 		r.Route("/lists", func(r chi.Router) {
 			r.Get("/", app.AdminListHandler.HandlerGetAllLists)
+			r.Get("/problem/{id}", app.AdminListHandler.HandlerGetListsByProblemID)
 		})
 
 		r.Route("/topics", func(r chi.Router) {
 			r.Get("/", app.AdminTopicHandler.HandlerGetAllTopics)
+			r.Get("/problem/{id}", app.AdminTopicHandler.HandlerGetTopicsByProblemID)
+		})
+
+		r.Route("/testcases", func(r chi.Router) {
+			r.Get("/problem/{id}", app.AdminTestcaseHandler.HandlerGetTestcasesByProblemID)
+		})
+
+		r.Route("/solutions", func(r chi.Router) {
+			r.Get("/problem/{id}", app.AdminSolutionHandler.HandlerGetSolutionsByProblemID)
 		})
 	})
 
