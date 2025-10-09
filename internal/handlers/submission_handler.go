@@ -136,28 +136,27 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 	var submissions []Judge0Submission
 
 	for _, testcase := range testcases {
-
-		template := `
-		%s
-		try {
-			const result = %s
-			console.log(JSON.stringify(result));
-		} catch (error) {
-			console.error('Runtime Error:', error.message);
-			process.exit(1);
-		}
+		inputTemplate := `
+			%s
+			try {
+				const result = %s;
+				console.log(JSON.stringify(result));
+			} catch (error) {
+				console.error('Runtime Error:', error.message);
+				process.exit(1);
+			}
 		`
 
-		sourceCode := fmt.Sprintf(template, body.Code, testcase.Input)
+		sourceCode := fmt.Sprintf(inputTemplate, body.Code, testcase.Input)
+		expectedOutput := strings.ReplaceAll(strings.TrimSpace(testcase.Output), " ", "")
 
 		submission := Judge0Submission{
 			LanguageID:     63,
 			SourceCode:     sourceCode,
-			ExpectedOutput: strings.TrimSpace(testcase.Output),
+			ExpectedOutput: expectedOutput,
 		}
 
 		submissions = append(submissions, submission)
-
 	}
 
 	batchRequest := Judge0BatchRequest{
@@ -297,9 +296,17 @@ func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Test
 		if result.Stdout != nil {
 			actualOutput = strings.TrimSpace(*result.Stdout)
 		}
-		expectedOutput := strings.TrimSpace(testCases[i].Output)
 
-		passed := result.Status.ID == 3 && actualOutput == expectedOutput
+		normalize := func(s string) string {
+			s = strings.TrimSpace(s)
+			s = strings.ReplaceAll(s, " ", "")
+			return s
+		}
+
+		actualOutputNorm := normalize(actualOutput)
+		expectedOutputNorm := normalize(testCases[i].Output)
+
+		passed := result.Status.ID == 3 && actualOutputNorm == expectedOutputNorm
 		if passed {
 			passedTests++
 		}
@@ -321,7 +328,7 @@ func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Test
 			TCTime:           tcTime,
 			TCMemory:         tcMemory,
 			TCOutput:         actualOutput,
-			TCExpectedOutput: expectedOutput,
+			TCExpectedOutput: expectedOutputNorm,
 		}
 	}
 
