@@ -75,6 +75,24 @@ func (mh *MiddlewareHandler) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
+func (mh *MiddlewareHandler) SoftAuthenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, _ := mh.SessionStore.Get(r, "session")
+		userEmail, _ := session.Values["user_email"].(string)
+		userIDStr, _ := session.Values["user_id"].(string)
+		userID, _ := uuid.Parse(userIDStr)
+
+		user := &models.User{
+			ID:    userID,
+			Email: userEmail,
+		}
+
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+
+	})
+}
+
 func (mh *MiddlewareHandler) AuthenticateAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		session, err := mh.SessionStore.Get(r, "session")

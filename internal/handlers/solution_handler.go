@@ -11,36 +11,37 @@ import (
 	"github.com/grvbrk/async0_server/internal/utils"
 )
 
-type TestcaseHandler struct {
-	TestcaseStore store.TestcaseStore
+type SolutionHandler struct {
+	SolutionStore store.SolutionStore
 	Logger        *log.Logger
 	Oauth         *auth.GoogleOauth
 }
 
-func NewTestcaseHandler(testcaseStore store.TestcaseStore, logger *log.Logger, oauth *auth.GoogleOauth) *TestcaseHandler {
-	return &TestcaseHandler{
-		TestcaseStore: testcaseStore,
+func NewSolutionHandler(solutionStore store.SolutionStore, logger *log.Logger, oauth *auth.GoogleOauth) *SolutionHandler {
+	return &SolutionHandler{
+		SolutionStore: solutionStore,
 		Logger:        logger,
 		Oauth:         oauth,
 	}
 }
 
-func (ph *TestcaseHandler) HandlerGetTestcasesByProblemID(w http.ResponseWriter, r *http.Request) {
+func (sh *SolutionHandler) HandlerGetSolutionsByProblemID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	problemID, err := uuid.Parse(id)
 	if err != nil {
-		ph.Logger.Println("Error parsing problem id", err)
+		sh.Logger.Println("Error parsing problem id", err)
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"message": "Bad Request"})
 		return
 	}
 
-	testcases, err := ph.TestcaseStore.GetTestcasesByProblemID(problemID)
+	solutions, err := sh.SolutionStore.GetSolutionsByProblemID(problemID)
 	if err != nil {
-		ph.Logger.Println("Error getting testcase by slug", err)
+		sh.Logger.Println("Error getting solutions by problem id", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
 	}
 
-	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": testcases})
+	utils.WriteJSON(w, http.StatusOK, utils.Envelope{"data": solutions})
+
 }

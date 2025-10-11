@@ -29,8 +29,10 @@ type Application struct {
 	Oauth      *auth.GoogleOauth
 	AdminOauth *auth.AdminGoogleOauth
 
-	MiddlewareHandler     *middlewares.MiddlewareHandler
+	MiddlewareHandler *middlewares.MiddlewareHandler
+
 	UserProblemHandler    *handlers.ProblemHandler
+	UserSolutionHandler   *handlers.SolutionHandler
 	UserListHandler       *handlers.ListHandler
 	UserTestcaseHandler   *handlers.TestcaseHandler
 	UserSubmissionHandler *handlers.SubmissionHandler
@@ -86,6 +88,7 @@ func NewApplication() (*Application, error) {
 	// user stores
 	userStore := store.NewPostgresUserStore(pgDB)
 	problemStore := store.NewPostgresProblemStore(pgDB)
+	solutionStore := store.NewPostgresSolutionStore(pgDB)
 	listStore := store.NewPostgresListStore(pgDB)
 	testcaseStore := store.NewPostgresTestcaseStore(pgDB)
 	submissionStore := store.NewPostgresSubmissionStore(pgDB)
@@ -113,6 +116,7 @@ func NewApplication() (*Application, error) {
 
 	// user handlers
 	userProblemHandler := handlers.NewProblemHandler(problemStore, logger, oauth)
+	userSolutionHandler := handlers.NewSolutionHandler(solutionStore, logger, oauth)
 	userListHandler := handlers.NewListHandler(listStore, logger, oauth)
 	userTestcaseHandler := handlers.NewTestcaseHandler(testcaseStore, logger, oauth)
 	userSubmissionHandler := handlers.NewSubmissionHandler(submissionStore, testcaseStore, logger, oauth)
@@ -135,8 +139,10 @@ func NewApplication() (*Application, error) {
 		Oauth:      oauth,
 		AdminOauth: adminOauth,
 
-		MiddlewareHandler:     middlewareHandler,
+		MiddlewareHandler: middlewareHandler,
+
 		UserProblemHandler:    userProblemHandler,
+		UserSolutionHandler:   userSolutionHandler,
 		UserListHandler:       userListHandler,
 		UserTestcaseHandler:   userTestcaseHandler,
 		UserSubmissionHandler: userSubmissionHandler,

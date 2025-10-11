@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS list_problems (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (list_id, problem_id),
-  CONSTRAINT unique_position_per_list UNIQUE (list_id, position)
+  -- CONSTRAINT unique_position_per_list UNIQUE (list_id, position)
 );
 
 CREATE INDEX IF NOT EXISTS idx_problem_topics_problem_id ON problem_topics(problem_id);

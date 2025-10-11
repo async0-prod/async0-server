@@ -53,6 +53,30 @@ func (ap *AdminPostgresProblemStore) GetAllProblems() ([]models.Problem, error) 
 	return problems, nil
 }
 
+func (ap *AdminPostgresProblemStore) GetProblemByID(problemID uuid.UUID) (models.Problem, error) {
+
+	query := `
+		SELECT id, name, slug, description, link, problem_number, difficulty, starter_code, time_limit, memory_limit, acceptance_rate, total_submissions, successful_submissions, is_active
+		FROM problems
+		WHERE id = $1
+	`
+
+	row := ap.DB.QueryRow(query, problemID)
+
+	problem := models.Problem{}
+	err := row.Scan(&problem.ID, &problem.Name, &problem.Slug, &problem.Description, &problem.Link, &problem.ProblemNumber, &problem.Difficulty, &problem.StarterCode, &problem.TimeLimit, &problem.MemoryLimit, &problem.AcceptanceRate, &problem.TotalSubmissions, &problem.SuccessfulSubmissions, &problem.IsActive)
+	if err != nil {
+		return models.Problem{}, fmt.Errorf("error running get problem by id query: %w", err)
+	}
+
+	if err == sql.ErrNoRows {
+		return models.Problem{}, fmt.Errorf("problem not found")
+	}
+
+	return problem, nil
+
+}
+
 func (ap *AdminPostgresProblemStore) CreateProblem(problem models.Problem, listIDs []uuid.UUID, topicIDs []uuid.UUID, testcases []models.Testcase, solutions []models.Solution) error {
 
 	tx, err := ap.DB.Begin()
@@ -143,13 +167,14 @@ func (ap *AdminPostgresProblemStore) UpdateProblem(problemID uuid.UUID, problem 
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
+
 	defer func() {
 		if rErr := tx.Rollback(); rErr != nil && rErr != sql.ErrTxDone {
 			fmt.Printf("rollback error: %v", rErr)
 		}
 	}()
 
-	// 1️⃣ Update main problem
+	// Update main problem
 	query := `
 		UPDATE problems
 		SET name = $1,
@@ -172,7 +197,7 @@ func (ap *AdminPostgresProblemStore) UpdateProblem(problemID uuid.UUID, problem 
 		return fmt.Errorf("failed to update problem: %w", err)
 	}
 
-	// 2️⃣ Replace topics
+	// Replace topics
 	_, err = tx.Exec(`DELETE FROM problem_topics WHERE problem_id = $1`, problemID)
 	if err != nil {
 		return fmt.Errorf("failed to clear problem_topics: %w", err)
@@ -184,7 +209,7 @@ func (ap *AdminPostgresProblemStore) UpdateProblem(problemID uuid.UUID, problem 
 		}
 	}
 
-	// 3️⃣ Replace lists
+	// Replace lists
 	_, err = tx.Exec(`DELETE FROM list_problems WHERE problem_id = $1`, problemID)
 	if err != nil {
 		return fmt.Errorf("failed to clear list_problems: %w", err)
@@ -197,7 +222,7 @@ func (ap *AdminPostgresProblemStore) UpdateProblem(problemID uuid.UUID, problem 
 		}
 	}
 
-	// 4️⃣ Replace testcases
+	// Replace testcases
 	_, err = tx.Exec(`DELETE FROM testcases WHERE problem_id = $1`, problemID)
 	if err != nil {
 		return fmt.Errorf("failed to clear testcases: %w", err)
@@ -210,7 +235,7 @@ func (ap *AdminPostgresProblemStore) UpdateProblem(problemID uuid.UUID, problem 
 		}
 	}
 
-	// 5️⃣ Replace solutions
+	// Replace solutions
 	_, err = tx.Exec(`DELETE FROM solutions WHERE problem_id = $1`, problemID)
 	if err != nil {
 		return fmt.Errorf("failed to clear solutions: %w", err)
@@ -232,28 +257,4 @@ func (ap *AdminPostgresProblemStore) UpdateProblem(problemID uuid.UUID, problem 
 		return fmt.Errorf("failed to commit update: %w", err)
 	}
 	return nil
-}
-
-func (ap *AdminPostgresProblemStore) GetProblemByID(problemID uuid.UUID) (models.Problem, error) {
-
-	query := `
-		SELECT id, name, slug, description, link, problem_number, difficulty, starter_code, time_limit, memory_limit, acceptance_rate, total_submissions, successful_submissions, is_active
-		FROM problems
-		WHERE id = $1
-	`
-
-	row := ap.DB.QueryRow(query, problemID)
-
-	problem := models.Problem{}
-	err := row.Scan(&problem.ID, &problem.Name, &problem.Slug, &problem.Description, &problem.Link, &problem.ProblemNumber, &problem.Difficulty, &problem.StarterCode, &problem.TimeLimit, &problem.MemoryLimit, &problem.AcceptanceRate, &problem.TotalSubmissions, &problem.SuccessfulSubmissions, &problem.IsActive)
-	if err != nil {
-		return models.Problem{}, fmt.Errorf("error running get problem by id query: %w", err)
-	}
-
-	if err == sql.ErrNoRows {
-		return models.Problem{}, fmt.Errorf("problem not found")
-	}
-
-	return problem, nil
-
 }

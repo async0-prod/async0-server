@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS solutions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   problem_id UUID NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
   title VARCHAR(100) NOT NULL,
-  hint VARCHAR(50) NOT NULL,
+  hint TEXT NOT NULL,
   description TEXT,
   code TEXT NOT NULL,
   code_explanation TEXT,

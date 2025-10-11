@@ -42,8 +42,13 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		r.Use(app.MiddlewareHandler.Cors)
 
 		r.Route("/problems", func(r chi.Router) {
-			r.Get("/table/{listID}", app.UserProblemHandler.HandlerGetTanstackTableProblems)
+			r.With(app.MiddlewareHandler.SoftAuthenticate).
+				Get("/table/{listID}", app.UserProblemHandler.HandlerGetTanstackTableProblems)
 			r.Get("/{slug}", app.UserProblemHandler.HandlerGetProblemBySlug)
+		})
+
+		r.Route("/solutions", func(r chi.Router) {
+			r.Get("/problem/{id}", app.UserSolutionHandler.HandlerGetSolutionsByProblemID)
 		})
 
 		r.Route("/lists", func(r chi.Router) {
@@ -56,7 +61,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		})
 
 		r.Route("/testcases", func(r chi.Router) {
-			r.Get("/problem/{id}", app.UserTestcaseHandler.HandlerGetTestcaseByProblemID)
+			r.Get("/problem/{id}", app.UserTestcaseHandler.HandlerGetTestcasesByProblemID)
 		})
 
 		r.Route("/submissions", func(r chi.Router) {
@@ -69,7 +74,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		})
 
 		r.Route("/analytics", func(r chi.Router) {
-			r.Use(app.MiddlewareHandler.Authenticate)
+			r.Use(app.MiddlewareHandler.SoftAuthenticate)
 			r.Get("/list/{listID}", app.UserAnalyticsHandler.HandlerGetCardAnalyticsByListID)
 		})
 

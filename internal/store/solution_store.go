@@ -1,4 +1,4 @@
-package admin
+package store
 
 import (
 	"database/sql"
@@ -8,21 +8,22 @@ import (
 	"github.com/grvbrk/async0_server/internal/models"
 )
 
-type AdminPostgresSolutionStore struct {
+type PostgresSolutionStore struct {
 	DB *sql.DB
 }
 
-func NewPostgresAdminSolutionStore(db *sql.DB) *AdminPostgresSolutionStore {
-	return &AdminPostgresSolutionStore{
+func NewPostgresSolutionStore(db *sql.DB) *PostgresSolutionStore {
+	return &PostgresSolutionStore{
 		DB: db,
 	}
 }
 
-type AdminSolutionStore interface {
+type SolutionStore interface {
 	GetSolutionsByProblemID(problemID uuid.UUID) ([]models.SolutionBasic, error)
 }
 
-func (ap *AdminPostgresSolutionStore) GetSolutionsByProblemID(problemID uuid.UUID) ([]models.SolutionBasic, error) {
+func (ps *PostgresSolutionStore) GetSolutionsByProblemID(problemID uuid.UUID) ([]models.SolutionBasic, error) {
+
 	query := `
 		SELECT
 			id,
@@ -36,12 +37,13 @@ func (ap *AdminPostgresSolutionStore) GetSolutionsByProblemID(problemID uuid.UUI
 			space_complexity,
 			difficulty_level,
 			display_order,
-			author
+			author,
+			is_active
 		FROM solutions
 		WHERE problem_id = $1 AND is_active = TRUE
 	`
 
-	rows, err := ap.DB.Query(query, problemID)
+	rows, err := ps.DB.Query(query, problemID)
 	if err != nil {
 		return nil, fmt.Errorf("error querying solutions: %w", err)
 	}
@@ -64,6 +66,7 @@ func (ap *AdminPostgresSolutionStore) GetSolutionsByProblemID(problemID uuid.UUI
 			&sol.DifficultyLevel,
 			&sol.DisplayOrder,
 			&sol.Author,
+			&sol.IsActive,
 		)
 
 		if err != nil {
@@ -74,7 +77,7 @@ func (ap *AdminPostgresSolutionStore) GetSolutionsByProblemID(problemID uuid.UUI
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating solutions: %w", err)
+		return nil, fmt.Errorf("error iterating solution: %w", err)
 	}
 
 	return solutions, nil

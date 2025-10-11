@@ -27,7 +27,7 @@ type TanstackTableProblem struct {
 	Difficulty string    `json:"difficulty"`
 	ListNames  []string  `json:"list_names"`
 	TopicNames []string  `json:"topic_names"`
-	HasSolved  *bool     `json:"has_solved"`
+	HasSolved  bool      `json:"has_solved"`
 }
 
 type ProblemStore interface {
@@ -83,7 +83,7 @@ func (pg *PostgresProblemStore) GetTanstackTableProblemsByListID(userID *uuid.UU
 		STRING_AGG(DISTINCT l.name, ', ') as list_names,
 		STRING_AGG(DISTINCT t.name, ', ') as topic_names,
 		CASE
-			WHEN $1::UUID IS NULL THEN NULL
+			WHEN $1::UUID IS NULL THEN false
 			WHEN s.user_id IS NOT NULL THEN true
 			ELSE false
 		END as has_solved
