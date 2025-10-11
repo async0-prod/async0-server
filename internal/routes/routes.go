@@ -83,7 +83,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	r.Route("/admin", func(r chi.Router) {
 		r.Use(httprate.LimitAll(100, time.Minute))
 		r.Use(app.MiddlewareHandler.Cors)
-		// r.Use(app.MiddlewareHandler.AuthenticateAdmin)
+		r.Use(app.MiddlewareHandler.AuthenticateAdmin)
 
 		r.Route("/problems", func(r chi.Router) {
 			r.Get("/", app.AdminProblemHandler.HandlerGetAllProblems)
