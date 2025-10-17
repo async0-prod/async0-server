@@ -3,12 +3,15 @@ package app
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 
+	"github.com/gorilla/sessions"
 	"github.com/grvbrk/async0_server/internal/auth"
 	"github.com/grvbrk/async0_server/internal/handlers"
 	adminHandler "github.com/grvbrk/async0_server/internal/handlers/admin"
 	"github.com/grvbrk/async0_server/internal/middlewares"
+	"github.com/grvbrk/async0_server/internal/services"
 	"github.com/grvbrk/async0_server/internal/store"
 	"github.com/grvbrk/async0_server/internal/store/admin"
 	"github.com/rbcervilla/redisstore/v9"
@@ -51,13 +54,11 @@ func NewApplication() (*Application, error) {
 	logger := log.New(os.Stdout, "LOGGING: ", log.Ldate|log.Ltime)
 	adminLogger := log.New(os.Stdout, "ADMIN LOGGING: ", log.Ldate|log.Ltime)
 
-	pgDB, err := store.ConnectPGDB(logger)
+	pgDB, err := services.ConnectPGDB()
 	if err != nil {
 		logger.Println("Error connecting to db")
 		return nil, err
 	}
-
-	logger.Println("Database connected...")
 
 	// err = store.MigrateFS(pgDB, migrations.FS, "db")
 	// if err != nil {
@@ -65,23 +66,26 @@ func NewApplication() (*Application, error) {
 	// 	panic(err)
 	// }
 
-	// logger.Println("Database migrated...")
-
-	redisClient, err := store.ConnectRedis()
+	redisClient, err := services.ConnectRedis()
 	if err != nil {
 		logger.Println("PANIC: Redis connection failed, exiting...")
-		panic(err)
+		return nil, err
 	}
-
-	logger.Println("Redis connected...")
 
 	sessionStore, err := redisstore.NewRedisStore(context.Background(), redisClient)
 	if err != nil {
 		logger.Println("PANIC: Redis session store failed, exiting...")
-		panic(err)
+		return nil, err
 	}
 
-	logger.Println("Redis session store connected...")
+	sessionStore.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 days
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
+		Domain:   ".nazrein.dev",
+	})
 
 	middlewareHandler := middlewares.NewMiddlewareHandler(logger, sessionStore)
 

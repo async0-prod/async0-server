@@ -32,3 +32,5 @@ go.work.sum
 # .vscode/
 
 database
+stack.prod.yml
+stack.dev.yml

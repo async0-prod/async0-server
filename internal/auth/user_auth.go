@@ -38,7 +38,7 @@ func NewGoogleOauth(logger *log.Logger, store *redisstore.RedisStore, userStore 
 		Config: &oauth2.Config{
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID_USER"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET_USER"),
-			RedirectURL:  fmt.Sprintf("%s/auth/google/callback", os.Getenv("BACKEND_URL")),
+			RedirectURL:  fmt.Sprintf("%s/auth/google/callback", os.Getenv("NEXT_PUBLIC_BACKEND_URL")),
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
 			Endpoint:     google.Endpoint,
 		},
@@ -50,6 +50,24 @@ func NewGoogleOauth(logger *log.Logger, store *redisstore.RedisStore, userStore 
 func (g *GoogleOauth) Login(w http.ResponseWriter, r *http.Request) {
 	url := g.Config.AuthCodeURL("random-state-string", oauth2.AccessTypeOffline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func (g *GoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
+	session, _ := g.Store.Get(r, "async0_session")
+
+	for key := range session.Values {
+		delete(session.Values, key)
+	}
+
+	session.Options.MaxAge = -1
+
+	err := session.Save(r, w)
+	if err != nil {
+		g.Logger.Println("Error clearing session", err)
+	}
+
+	redirectURL := os.Getenv("FRONTEND_URL")
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (g *GoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +131,7 @@ func (g *GoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, _ := g.Store.Get(r, "session")
+	session, _ := g.Store.Get(r, "async0_session")
 	session.Values["user_id"] = userID
 	session.Values["user_email"] = userInfo.Email
 	session.Values["user_image"] = userInfo.Image
@@ -130,26 +148,8 @@ func (g *GoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
-func (g *GoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
-	session, _ := g.Store.Get(r, "session")
-
-	for key := range session.Values {
-		delete(session.Values, key)
-	}
-
-	session.Options.MaxAge = -1
-
-	err := session.Save(r, w)
-	if err != nil {
-		g.Logger.Println("Error clearing session", err)
-	}
-
-	redirectURL := os.Getenv("FRONTEND_URL")
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-}
-
 func (g *GoogleOauth) AuthUser(w http.ResponseWriter, r *http.Request) {
-	user, err := g.Store.Get(r, "session")
+	user, err := g.Store.Get(r, "async0_session")
 	if err != nil {
 		g.Logger.Println("Error getting session", err)
 		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})

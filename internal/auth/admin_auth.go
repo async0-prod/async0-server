@@ -36,7 +36,7 @@ func NewAdminGoogleOauth(logger *log.Logger, adminStore *redisstore.RedisStore, 
 		Config: &oauth2.Config{
 			ClientID:     os.Getenv("GOOGLE_CLIENT_ID_ADMIN"),
 			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET_ADMIN"),
-			RedirectURL:  fmt.Sprintf("%s/auth/admin/google/callback", os.Getenv("BACKEND_URL")),
+			RedirectURL:  fmt.Sprintf("%s/auth/admin/google/callback", os.Getenv("NEXT_PUBLIC_BACKEND_URL")),
 			Scopes:       []string{"https://www.googleapis.com/auth/userinfo.profile", "https://www.googleapis.com/auth/userinfo.email"},
 			Endpoint:     google.Endpoint,
 		},
@@ -99,22 +99,25 @@ func (g *AdminGoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 
 	userId = user.ID.String()
 
-	session, _ := g.Store.Get(r, "admin_session")
+	session, _ := g.Store.Get(r, "async0_admin_session")
 	session.Values["admin_email"] = userInfo.Email
 	session.Values["admin_id"] = userId
-	session.Values["admin_image"] = userInfo.Image
 	session.Values["admin_name"] = userInfo.Name
+	session.Values["admin_image"] = userInfo.Image
 
 	err = session.Save(r, w)
 	if err != nil {
 		g.Logger.Println("Error saving admin session", err)
+		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"Error": "Internal Server Error"})
+		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("%s/problems", os.Getenv("ADMIN_FRONTEND_URL")), http.StatusSeeOther)
+	redirectURL := os.Getenv("ADMIN_FRONTEND_URL") + "/problems"
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (g *AdminGoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
-	session, _ := g.Store.Get(r, "admin_session")
+	session, _ := g.Store.Get(r, "async0_admin_session")
 
 	for key := range session.Values {
 		delete(session.Values, key)
@@ -132,19 +135,17 @@ func (g *AdminGoogleOauth) Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *AdminGoogleOauth) AuthAdmin(w http.ResponseWriter, r *http.Request) {
-	admin, err := g.Store.Get(r, "admin_session")
+	session, err := g.Store.Get(r, "async0_admin_session")
 	if err != nil {
-		g.Logger.Println("Error getting admin session", err)
-		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})
+		g.Logger.Println("Failed to decode admin session:", err)
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"Error": "Unauthorized"})
 		return
 	}
 
-	adminEmail, emailOk := admin.Values["admin_email"].(string)
-	adminIDStr, idOk := admin.Values["admin_id"].(string)
-	adminName, nameOk := admin.Values["admin_name"].(string)
-	adminImage, imageOk := admin.Values["admin_image"].(string)
-
-	fmt.Println(adminEmail, emailOk, adminIDStr, idOk, adminName, nameOk, adminImage, imageOk)
+	adminEmail, emailOk := session.Values["admin_email"].(string)
+	adminIDStr, idOk := session.Values["admin_id"].(string)
+	adminName, nameOk := session.Values["admin_name"].(string)
+	adminImage, imageOk := session.Values["admin_image"].(string)
 
 	if !emailOk || !idOk || !nameOk || !imageOk || adminEmail == "" || adminIDStr == "" || adminName == "" || adminImage == "" {
 		g.Logger.Println("Invalid or missing admin data in session")
