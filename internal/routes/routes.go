@@ -33,7 +33,6 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 			r.Use(app.MiddlewareHandler.Cors)
 			r.Get("/user", app.Oauth.AuthUser)
 			r.Get("/admin", app.AdminOauth.AuthAdmin)
-
 		})
 	})
 

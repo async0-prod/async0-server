@@ -4,17 +4,14 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/grvbrk/async0_server/internal/models"
 	"github.com/grvbrk/async0_server/internal/utils"
 	"github.com/rbcervilla/redisstore/v9"
 )
-
-var allowedOrigins = []string{
-	"http://localhost:3000",
-	"http://localhost:3001",
-}
 
 type contextKey string
 
@@ -189,6 +186,7 @@ func (mh *MiddlewareHandler) Security(next http.Handler) http.Handler {
 }
 
 func isOriginAllowed(origin string) bool {
+	allowedOrigins := strings.Split(os.Getenv("ALLOWED_ORIGINS"), ",")
 	for _, allowedOrigin := range allowedOrigins {
 		if origin == allowedOrigin {
 			return true
