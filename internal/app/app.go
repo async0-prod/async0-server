@@ -84,7 +84,7 @@ func NewApplication() (*Application, error) {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteNoneMode,
-		Domain:   ".nazrein.dev",
+		Domain:   ".async0.com",
 	})
 
 	middlewareHandler := middlewares.NewMiddlewareHandler(logger, sessionStore)

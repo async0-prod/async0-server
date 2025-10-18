@@ -95,6 +95,7 @@ func (g *GoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 		Name     string `json:"name"`
 		Image    string `json:"picture"`
 	}
+
 	err = json.NewDecoder(resp.Body).Decode(&userInfo)
 	if err != nil {
 		g.Logger.Println("Error decoding user info", err)
@@ -125,7 +126,7 @@ func (g *GoogleOauth) Callback(w http.ResponseWriter, r *http.Request) {
 		userID = user.ID.String()
 	}
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil {
 		g.Logger.Println("Error getting user by google id", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"Error": "Internal Server Error"})
 		return
