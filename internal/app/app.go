@@ -77,15 +77,48 @@ func NewApplication() (*Application, error) {
 		logger.Println("PANIC: Redis session store failed, exiting...")
 		return nil, err
 	}
+	sessionStore.KeyPrefix("user_session_")
 
-	sessionStore.Options(sessions.Options{
+	adminSessionStore, err := redisstore.NewRedisStore(context.Background(), redisClient)
+	if err != nil {
+		logger.Println("PANIC: Admin redis session store failed, exiting...")
+		return nil, err
+	}
+	adminSessionStore.KeyPrefix("admin_session_")
+
+	env := os.Getenv("ENV")
+	userOptions := sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 days
 		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
-		Domain:   ".async0.com",
-	})
+	}
+
+	adminOptions := sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 days
+		HttpOnly: true,
+	}
+
+	if env == "production" {
+		userOptions.Secure = true
+		userOptions.SameSite = http.SameSiteNoneMode
+		userOptions.Domain = ".async0.com"
+
+		adminOptions.Secure = true
+		adminOptions.SameSite = http.SameSiteNoneMode
+		adminOptions.Domain = ".async0.com"
+	} else {
+		userOptions.Secure = false
+		userOptions.SameSite = http.SameSiteLaxMode
+		userOptions.Domain = ""
+
+		adminOptions.Secure = false
+		adminOptions.SameSite = http.SameSiteLaxMode
+		adminOptions.Domain = ""
+	}
+
+	sessionStore.Options(userOptions)
+	adminSessionStore.Options(adminOptions)
 
 	middlewareHandler := middlewares.NewMiddlewareHandler(logger, sessionStore)
 
@@ -113,7 +146,7 @@ func NewApplication() (*Application, error) {
 		return nil, err
 	}
 
-	adminOauth, err := auth.NewAdminGoogleOauth(adminLogger, sessionStore, userStore)
+	adminOauth, err := auth.NewAdminGoogleOauth(adminLogger, adminSessionStore, userStore)
 	if err != nil {
 		return nil, err
 	}

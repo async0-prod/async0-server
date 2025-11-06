@@ -33,7 +33,7 @@ func NewMiddlewareHandler(logger *log.Logger, store *redisstore.RedisStore) *Mid
 func (mh *MiddlewareHandler) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		session, err := mh.SessionStore.Get(r, "session")
+		session, err := mh.SessionStore.Get(r, "async0_session")
 		if err != nil {
 			mh.logger.Println("Error getting session in auth middleware:", err)
 			utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authorized"})
@@ -74,7 +74,7 @@ func (mh *MiddlewareHandler) Authenticate(next http.Handler) http.Handler {
 
 func (mh *MiddlewareHandler) SoftAuthenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, _ := mh.SessionStore.Get(r, "session")
+		session, _ := mh.SessionStore.Get(r, "async0_session")
 		userEmail, _ := session.Values["user_email"].(string)
 		userIDStr, _ := session.Values["user_id"].(string)
 		userID, _ := uuid.Parse(userIDStr)
@@ -92,7 +92,7 @@ func (mh *MiddlewareHandler) SoftAuthenticate(next http.Handler) http.Handler {
 
 func (mh *MiddlewareHandler) AuthenticateAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		session, err := mh.SessionStore.Get(r, "session")
+		session, err := mh.SessionStore.Get(r, "async0_admin_session")
 		if err != nil {
 			mh.logger.Println("Error getting admin session in auth middleware:", err)
 			utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Admin access required"})

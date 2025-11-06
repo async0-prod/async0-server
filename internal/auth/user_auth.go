@@ -162,6 +162,9 @@ func (g *GoogleOauth) AuthUser(w http.ResponseWriter, r *http.Request) {
 	userName, nameOk := user.Values["user_name"].(string)
 	userImage, imageOk := user.Values["user_image"].(string)
 
+	// fmt.Println(userEmail, userIDStr, userName, userImage)
+	// fmt.Println(emailOk, idOk, nameOk, imageOk)
+
 	if !emailOk || !idOk || !nameOk || !imageOk || userEmail == "" || userIDStr == "" || userName == "" || userImage == "" {
 		g.Logger.Println("Invalid or missing user data in session")
 		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "Not Authenticated"})

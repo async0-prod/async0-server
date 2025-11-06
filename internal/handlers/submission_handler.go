@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -170,9 +171,19 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	resp, err := http.Post(fmt.Sprintf("%s/submissions/batch?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer([]byte(jsonBody)))
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Post(fmt.Sprintf("%s/submissions/batch?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer([]byte(jsonBody)))
 	if err != nil {
-		ph.Logger.Println("Error submitting batch request", err)
+		if os.IsTimeout(err) {
+			ph.Logger.Println("Judge0 batch submit request timed out", err)
+			utils.WriteJSON(w, http.StatusRequestTimeout, utils.Envelope{"message": "Request timed out"})
+			return
+		}
+
+		ph.Logger.Println("Error submitting judge0 batch request", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
 	}
@@ -191,8 +202,11 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 		tokens[i] = submission["token"]
 	}
 
-	results, err := pollJudge0BatchResults(tokens)
-	if err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	results, err := pollJudge0BatchResults(ctx, tokens)
+	if err != nil || len(results) == 0 {
 		ph.Logger.Println("Error polling judge0 results", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
@@ -211,21 +225,44 @@ func (ph *SubmissionHandler) HandlerSubmitSubmission(w http.ResponseWriter, r *h
 
 }
 
-func pollJudge0BatchResults(tokens []string) ([]Judge0Result, error) {
+func pollJudge0BatchResults(ctx context.Context, tokens []string) ([]Judge0Result, error) {
 	tokensParam := strings.Join(tokens, ",")
-	maxRetries := 30
 	baseDelay := 500 * time.Millisecond
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := http.Get(fmt.Sprintf("%s/submissions/batch?tokens=%s&base64_encoded=false", os.Getenv("JUDGE0_URL"), tokensParam))
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	attempt := 0
+
+	for {
+		// First check if the context is done or not (timeout or cancellation)
+		select {
+		case <-ctx.Done():
+			return []Judge0Result{}, ctx.Err()
+		default:
+		}
+
+		req, err := http.NewRequestWithContext(
+			ctx, "GET", fmt.Sprintf("%s/submissions/batch?tokens=%s&base64_encoded=false", os.Getenv("JUDGE0_URL"), tokensParam), nil,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("error sending get request: %w", err)
+			return []Judge0Result{}, fmt.Errorf("error creating request: %w", err)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			// If context is done, return immediately
+			if ctx.Err() != nil {
+				return []Judge0Result{}, ctx.Err()
+			}
+			return []Judge0Result{}, fmt.Errorf("error sending get request: %w", err)
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return nil, fmt.Errorf("error reading response body: %w", err)
+			return []Judge0Result{}, fmt.Errorf("error reading response body: %w", err)
 		}
 
 		var judge0Response struct {
@@ -238,14 +275,15 @@ func pollJudge0BatchResults(tokens []string) ([]Judge0Result, error) {
 		}
 
 		results := judge0Response.Submissions
-
 		if len(results) != len(tokens) {
 			return nil, fmt.Errorf("expected %d results, got %d", len(tokens), len(results))
 		}
 
+		// Check if all result are done processing
 		allComplete := true
 		for _, result := range results {
 			if result.Status.ID == 1 || result.Status.ID == 2 {
+				// status id < 2 means still pending
 				allComplete = false
 				break
 			}
@@ -256,13 +294,23 @@ func pollJudge0BatchResults(tokens []string) ([]Judge0Result, error) {
 		}
 
 		delay := time.Duration(float64(baseDelay) * (1.5 * float64(attempt)))
-		if delay > 5*time.Second {
-			delay = 5 * time.Second
+		if delay > 2*time.Second {
+			delay = 2 * time.Second // Cap at 2 seconds
 		}
-		time.Sleep(delay)
-	}
 
-	return nil, fmt.Errorf("polling timeout exceeded")
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return []Judge0Result{}, ctx.Err()
+		case <-timer.C:
+			// Wait for delay seconds
+			// Continue to next iteration
+		}
+
+		attempt++
+
+	}
 }
 
 func formatMultipleJudge0Results(results []Judge0Result, testCases []models.Testcase) models.SubmitSubmissionResponse {
@@ -370,9 +418,19 @@ func (ph *SubmissionHandler) HandlerRunSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	resp, err := http.Post(fmt.Sprintf("%s/submissions?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer([]byte(jsonBody)))
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	resp, err := client.Post(fmt.Sprintf("%s/submissions?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
-		ph.Logger.Println("Error submitting request", err)
+		if err, ok := err.(interface{ Timeout() bool }); ok && err.Timeout() {
+			ph.Logger.Println("Judge0 run request timed out", err)
+			utils.WriteJSON(w, http.StatusRequestTimeout, utils.Envelope{"message": "Request timed out"})
+			return
+		}
+
+		ph.Logger.Println("Error submitting judge0 run request", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
 	}
@@ -391,8 +449,16 @@ func (ph *SubmissionHandler) HandlerRunSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	pollResult, err := pollJudge0SingleResult(response.Token)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	pollResult, err := pollJudge0SingleResult(ctx, response.Token)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			ph.Logger.Println("Judge0 polling timed out")
+			utils.WriteJSON(w, http.StatusRequestTimeout, utils.Envelope{"message": "Execution timed out"})
+			return
+		}
 		ph.Logger.Println("Error polling judge0 results", err)
 		utils.WriteJSON(w, http.StatusInternalServerError, utils.Envelope{"message": "Internal Server Error"})
 		return
@@ -402,13 +468,38 @@ func (ph *SubmissionHandler) HandlerRunSubmission(w http.ResponseWriter, r *http
 
 }
 
-func pollJudge0SingleResult(token string) (Judge0Result, error) {
-	maxRetries := 30
+func pollJudge0SingleResult(ctx context.Context, token string) (Judge0Result, error) {
 	baseDelay := 500 * time.Millisecond
 
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		resp, err := http.Get(fmt.Sprintf("%s/submissions/%s?base64_encoded=false", os.Getenv("JUDGE0_URL"), token))
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
+
+	attempt := 0
+	for {
+		// Check if context is done (timeout or cancellation)
+		select {
+		case <-ctx.Done():
+			return Judge0Result{}, ctx.Err()
+		default:
+		}
+
+		req, err := http.NewRequestWithContext(
+			ctx,
+			"GET",
+			fmt.Sprintf("%s/submissions/%s?base64_encoded=false", os.Getenv("JUDGE0_URL"), token),
+			nil,
+		)
 		if err != nil {
+			return Judge0Result{}, fmt.Errorf("error creating request: %w", err)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			// If context is done, return immediately
+			if ctx.Err() != nil {
+				return Judge0Result{}, ctx.Err()
+			}
 			return Judge0Result{}, fmt.Errorf("error sending get request: %w", err)
 		}
 
@@ -424,18 +515,30 @@ func pollJudge0SingleResult(token string) (Judge0Result, error) {
 			return Judge0Result{}, fmt.Errorf("error unmarshalling response body: %w, raw response: %s", err, string(body))
 		}
 
+		// Check if processing is complete
 		if result.Status.ID != 1 && result.Status.ID != 2 {
 			return result, nil
 		}
 
+		// Calculate delay with exponential backoff
 		delay := time.Duration(float64(baseDelay) * (1.5 * float64(attempt)))
-		if delay > 5*time.Second {
-			delay = 5 * time.Second
+		if delay > 2*time.Second {
+			delay = 2 * time.Second // Cap at 2 seconds
 		}
-		time.Sleep(delay)
-	}
 
-	return Judge0Result{}, fmt.Errorf("polling timeout exceeded")
+		// Use a timer to sleep for delay seconds (basically time.sleep(delay))
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return Judge0Result{}, ctx.Err()
+		case <-timer.C:
+			// Wait for delay seconds
+			// Continue to next iteration
+		}
+
+		attempt++
+	}
 }
 
 func formatJudge0Result(result Judge0Result) RunSubmissionResponse {
