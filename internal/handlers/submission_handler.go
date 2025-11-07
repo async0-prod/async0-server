@@ -422,7 +422,7 @@ func (ph *SubmissionHandler) HandlerRunSubmission(w http.ResponseWriter, r *http
 		Timeout: 5 * time.Second,
 	}
 
-	resp, err := client.Post(fmt.Sprintf("%s/submissions?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer(jsonBody))
+	resp, err := client.Post(fmt.Sprintf("%s/submissions?base64_encoded=false&wait=false", os.Getenv("JUDGE0_URL")), "application/json", bytes.NewBuffer([]byte(jsonBody)))
 	if err != nil {
 		if err, ok := err.(interface{ Timeout() bool }); ok && err.Timeout() {
 			ph.Logger.Println("Judge0 run request timed out", err)
