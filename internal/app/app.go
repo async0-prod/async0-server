@@ -102,11 +102,11 @@ func NewApplication() (*Application, error) {
 	if env == "production" {
 		userOptions.Secure = true
 		userOptions.SameSite = http.SameSiteNoneMode
-		userOptions.Domain = ".async0.com"
+		userOptions.Domain = ".async0.in"
 
 		adminOptions.Secure = true
 		adminOptions.SameSite = http.SameSiteNoneMode
-		adminOptions.Domain = ".async0.com"
+		adminOptions.Domain = ".async0.in"
 	} else {
 		userOptions.Secure = false
 		userOptions.SameSite = http.SameSiteLaxMode
