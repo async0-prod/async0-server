@@ -1,0 +1,8 @@
+version: "2"
+
+linters:
+  exclusions:
+    presets:
+      # Matches golangci-lint v1's default behaviour, e.g. not flagging
+      # unchecked errors from `defer rows.Close()` / `defer resp.Body.Close()`.
+      - std-error-handling

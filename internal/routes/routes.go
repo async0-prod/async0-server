@@ -11,13 +11,13 @@ import (
 func SetupRoutes(app *app.Application) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Use(httprate.LimitAll(200, time.Minute))
+	r.Use(httprate.LimitBy(200, time.Minute, httprate.Key("*")))
 	r.Use(app.MiddlewareHandler.RequestLogger)
 	r.Use(app.MiddlewareHandler.Security)
 
 	r.Route("/auth", func(r chi.Router) {
 
-		r.Use(httprate.LimitAll(100, time.Minute))
+		r.Use(httprate.LimitBy(100, time.Minute, httprate.Key("*")))
 
 		// Auth routes without CORS
 		r.Get("/google/login", app.Oauth.Login)
@@ -37,7 +37,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	})
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(httprate.LimitAll(100, time.Minute))
+		r.Use(httprate.LimitBy(100, time.Minute, httprate.Key("*")))
 		r.Use(app.MiddlewareHandler.Cors)
 
 		r.Route("/problems", func(r chi.Router) {
@@ -80,7 +80,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	})
 
 	r.Route("/admin", func(r chi.Router) {
-		r.Use(httprate.LimitAll(100, time.Minute))
+		r.Use(httprate.LimitBy(100, time.Minute, httprate.Key("*")))
 		r.Use(app.MiddlewareHandler.Cors)
 		r.Use(app.MiddlewareHandler.AuthenticateAdmin)
 
