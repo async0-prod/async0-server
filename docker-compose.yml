@@ -1,26 +1,26 @@
 services:
-  db:
-    container_name: "async0-test-db"
-    image: postgres:16.2
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: "async0"
-      POSTGRES_USER: "postgres"
-      POSTGRES_PASSWORD: "postgres"
-    restart: unless-stopped
+  # db:
+  #   container_name: "async0-test-db"
+  #   image: postgres:16.2
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     POSTGRES_DB: "async0"
+  #     POSTGRES_USER: "postgres"
+  #     POSTGRES_PASSWORD: "postgres"
+  #   restart: unless-stopped
 
   redis:
     container_name: "async0-test-redis"
     image: redis:7.2.4
-    volumes:
-      - redis_data:/var/lib/redis/data
+    # volumes:
+    #   - redis_data:/var/lib/redis/data
     ports:
       - "6379:6379"
     restart: unless-stopped
 
-volumes:
-  redis_data:
-  pgdata:
+# volumes:
+  # redis_data:
+  # pgdata:
